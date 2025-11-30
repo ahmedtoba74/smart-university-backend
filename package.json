@@ -1,12 +1,12 @@
 {
   "name": "smart-university-backend",
   "version": "1.0.0",
-  "main": "app.js",
+  "main": "server.js",
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon app.js",
-    "dev": "nodemon app.js"
+    "start": "nodemon server.js",
+    "dev": "nodemon server.js"
   },
   "keywords": [],
   "author": "",
@@ -18,6 +18,7 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-mongo-sanitize": "^2.2.0",
+    "express-validator": "^7.3.1",
     "helmet": "^8.1.0",
     "hpp": "^0.2.3",
     "jsonwebtoken": "^9.0.2",
