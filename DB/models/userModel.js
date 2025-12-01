@@ -33,9 +33,9 @@ const userSchema = new mongoose.Schema({
         select: false, // Hashed
         validate: {
             validator: function(v) {
-                return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(v);
+                return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?_#-])[A-Za-z\d@$!%*?_#-]{8,}$/.test(v);
             },
-            message: props => `${props.value} is not a valid password!`
+            message: props => `Password must be at least 8 chars long, contain upper & lower case letters, a number, and a special char (@$!%*?_#-). Unsafe chars (<>&"') are not allowed.`
         }
     },
     role: {
@@ -100,19 +100,39 @@ const userSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-userSchema.pre('save', async function() {
-    if (this.isModified('password')) {
-        this.password = await bcrypt.hash(this.password, 12);
+userSchema.pre('save', async function(next) {
+    if (!this.isModified('password')) return next();
+
+    this.password = await bcrypt.hash(this.password, 12);
+
+    if (!this.isNew) {
+        this.passwordChangedAt = Date.now() - 1000;
     }
+    
+    next();
+});
+
+
+userSchema.pre(/^find/, function () {
+    this.find({ active: { $ne: false } });
 });
 
 userSchema.methods.comparePassword = async function(candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
 };
 
-userSchema.pre(/^find/, function () {
-    this.find({ active: { $ne: false } });
-});
+userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
+    if (this.passwordChangedAt) {
+        const changedTimestamp = parseInt(
+            this.passwordChangedAt.getTime() / 1000,
+            10,
+        ); // Convert to seconds
+        // console.log(changedTimestamp, JWTTimestamp);
+        return JWTTimestamp < changedTimestamp; // If JWT timestamp is less than the changed timestamp, password was changed after the token was issued
+    }
+
+    return false;
+};
 
 const User = mongoose.model("User", userSchema);
 export default User;

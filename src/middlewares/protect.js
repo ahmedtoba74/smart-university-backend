@@ -1,3 +1,9 @@
+import { promisify } from 'util';
+import jwt from 'jsonwebtoken';
+import User from '../../DB/models/userModel.js';
+import catchAsync from '../utils/catchAsync.js';
+import AppError from '../utils/appError.js';
+
 export const protect = catchAsync(async (req, res, next) => {
     let token;
 
@@ -33,6 +39,17 @@ export const protect = catchAsync(async (req, res, next) => {
         }
     }
 
+    // Check if user changed password after the token was issued
+    if (currentUser.changedPasswordAfter(decoded.iat)) {
+        return next(
+            new AppError(
+                "User recently changed password! Please log in again.",
+                401,
+            ),
+        );
+    }
+
     req.user = currentUser;
+    res.locals.user = currentUser;
     next();
 });

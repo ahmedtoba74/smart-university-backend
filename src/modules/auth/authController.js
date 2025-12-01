@@ -40,11 +40,47 @@ export const login = catchAsync(async (req, res, next) => {
         return next(new AppError('User not found', 404));
     }
 
-    if (!user.comparePassword(password)) {
+    if (!(await user.comparePassword(password))) {
         return next(new AppError('Incorrect password', 401));
     }
     
     await User.findByIdAndUpdate(user._id, { lastLoginAt: Date.now() - 1000 });
 
     createSendToken(user, 200, res);
-})
+});
+
+export const changePassword = catchAsync(async (req, res, next) => {
+    const { oldPassword, password, passwordConfirm } = req.body;
+    if (!oldPassword || !password || !passwordConfirm) {
+        return next(new AppError('Please provide oldPassword, password and passwordConfirm', 400));
+    }
+
+    if (password !== passwordConfirm) {
+        return next(new AppError('Passwords do not match', 400));
+    }
+    const user = await User.findById(req.user.id).select('+password');
+    if (!user) {
+        return next(new AppError('User not found', 404));
+    }
+    if (!(await user.comparePassword(oldPassword))) {
+        return next(new AppError('Incorrect password', 401));
+    }
+
+    if (password === oldPassword) {
+        return next(new AppError('New password cannot be the same as old password', 400));
+    }
+    user.password = password;
+    await user.save();
+    createSendToken(user, 200, res);
+});
+
+export const logout = catchAsync(async (req, res, next) => {
+    res.cookie('jwt', 'loggedout', {
+        expires: new Date(Date.now() + 10 * 1000),
+        httpOnly: true
+    });
+    res.status(200).json({
+        status: 'success',
+        message: 'Logged out successfully'
+    });
+});
