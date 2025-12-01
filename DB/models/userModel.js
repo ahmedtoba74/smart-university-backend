@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema({
     name: {
@@ -78,7 +79,7 @@ const userSchema = new mongoose.Schema({
     department_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Department",
-        required: [true, "Department is required"]
+        // required: [true, "Department is required"]
     },
     active: {
         type: Boolean,
@@ -91,8 +92,27 @@ const userSchema = new mongoose.Schema({
     },
     passwordChangedAt: Date,
     passwordResetToken: String,
-    passwordResetExpires: Date
+    passwordResetExpires: Date,
+
+    lastLoginAt: {
+        type: Date,
+        default: null
+    }
 }, { timestamps: true });
+
+userSchema.pre('save', async function() {
+    if (this.isModified('password')) {
+        this.password = await bcrypt.hash(this.password, 12);
+    }
+});
+
+userSchema.methods.comparePassword = async function(candidatePassword) {
+    return await bcrypt.compare(candidatePassword, this.password);
+};
+
+userSchema.pre(/^find/, function () {
+    this.find({ active: { $ne: false } });
+});
 
 const User = mongoose.model("User", userSchema);
 export default User;

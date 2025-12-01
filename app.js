@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
+
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -10,6 +11,9 @@ import compression from 'compression';
 import sanitize from 'express-mongo-sanitize';
 import AppError from './src/utils/appError.js';
 import globalErrorHandler from './src/utils/errorHandler.js';
+
+import userRouter from './src/modules/users/userRouter.js';
+import authRouter from './src/modules/auth/authRouter.js';
 
 // Load env vars
 dotenv.config();
@@ -54,10 +58,17 @@ app.use(compression());
 // Parse cookies
 app.use(cookieParser());
 
-// Test Route
-app.get('/', (req, res) => {
-  res.status(200).json({ message: 'Smart University Backend is Running' });
+// Test router
+app.get('/api/v1/test', (req, res) => {
+    res.status(200).json({
+        status: 'success',
+        message: 'Test route'
+    });
 });
+
+// Router
+app.use('/api/v1/users', userRouter);
+app.use('/api/v1/auth', authRouter);
 
 // Handle Unhandled Routes
 app.all(/(.*)/, (req, res, next) => {
