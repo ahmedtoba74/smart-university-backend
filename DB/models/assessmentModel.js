@@ -31,33 +31,33 @@ const assessmentSchema = new mongoose.Schema({
             fileName: String,
             fileUrl: String
         }],
-
         questionType: {
             type: String,
             enum: ['MCQ-Single', 'MCQ-Multiple', 'TrueFalse', 'Short-Answer', 'Paragraph', 'FileUpload'],
             required: true
         },
-
         isRequired: {
             type: Boolean,
             default: true
         },
-
         options: [{
             text: String,
-            isCorrect: { type: Boolean, default: false }
+            isCorrect: { 
+                type: Boolean, 
+                default: false,
+                select: false 
+            }
         }],
-        
-        shuffleOptions: { type: Boolean, default: false }, // Specific to MCQ
-
+        shuffleOptions: { type: Boolean, default: false },
         validation: {
-            regex: String, // For text answers
+            regex: String,
             minLength: Number,
             maxLength: Number
         },
-
-        modelAnswer: { type: String }, 
-
+        modelAnswer: { 
+            type: String,
+            select: false 
+        }, 
         points: { type: Number, required: true }
     }],
     
@@ -65,7 +65,7 @@ const assessmentSchema = new mongoose.Schema({
         shuffleQuestions: { type: Boolean, default: false },
         allowEditAfterSubmit: { type: Boolean, default: false },
         limitToOneResponse: { type: Boolean, default: true },
-        showGradesImmediately: { type: Boolean, default: true },
+        showGradesImmediately: { type: Boolean, default: false },
         acceptingResponses: { type: Boolean, default: true },
         confirmationMessage: { type: String, default: "Your response has been recorded." }
     },

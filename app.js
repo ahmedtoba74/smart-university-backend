@@ -50,6 +50,7 @@ const limiter = rateLimit({
     message: 'Too many requests from this IP, please try again after 10 minutes',
     standardHeaders: true, 
     legacyHeaders: false,
+    validate: { trustProxy: false }
 });
 
 // Apply rate limiter to all requests
@@ -63,7 +64,7 @@ app.use('/api', limiter);
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(express.json({ limit: '10kb' }));
 
-// Data sanitization against NoSQL query injection
+// Data sanitization against NoSQL query injection & XSS
 app.use(sanitizer.clean({
     xss: true,
     noSql: true,
@@ -71,7 +72,7 @@ app.use(sanitizer.clean({
     whitelist: [
         'password', 
         'passwordConfirm', 
-        'oldPassword'
+        'currentPassword'
     ]
 }));
 
