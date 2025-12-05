@@ -1,10 +1,22 @@
 import AppError from "./appError.js";
 
+/**
+ * Handle MongoDB CastError (invalid ID).
+ * @function handleCastErrorDB
+ * @param {Object} err - The error object.
+ * @returns {AppError} Operational error with 400 status.
+ */
 const handleCastErrorDB = (err) => {
     const message = `Invalid ${err.path}: ${err.value}`;
     return new AppError(message, 400);
 };
 
+/**
+ * Handle MongoDB Duplicate Fields Error.
+ * @function handleDuplicateFieldsDB
+ * @param {Object} err - The error object.
+ * @returns {AppError} Operational error with 400 status.
+ */
 const handleDuplicateFieldsDB = (err) => {
     // Extract value from errmsg or keyValue
     const value = err.keyValue ? Object.values(err.keyValue)[0] : err.errmsg.match(/(["'])(\\?.)*?\1/)[0];
@@ -12,18 +24,41 @@ const handleDuplicateFieldsDB = (err) => {
     return new AppError(message, 400);
 };
 
+/**
+ * Handle Mongoose Validation Error.
+ * @function handleValidationErrorDB
+ * @param {Object} err - The error object.
+ * @returns {AppError} Operational error with 400 status.
+ */
 const handleValidationErrorDB = (err) => {
     const errors = Object.values(err.errors).map((el) => el.message);
     const message = `Invalid input data: ${errors.join(". ")}`;
     return new AppError(message, 400);
 };
 
+/**
+ * Handle JWT Error (invalid token).
+ * @function handleJWTError
+ * @returns {AppError} Operational error with 401 status.
+ */
 const handleJWTError = () =>
     new AppError("Invalid token. Please log in again!", 401);
 
+/**
+ * Handle JWT Expired Error.
+ * @function handleJWTExpiredError
+ * @returns {AppError} Operational error with 401 status.
+ */
 const handleJWTExpiredError = () =>
     new AppError("Your token has expired! Please log in again.", 401);
 
+/**
+ * Send detailed error response in development environment.
+ * @function sendErrorDev
+ * @param {Object} err - The error object.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 const sendErrorDev = (err, req, res) => {
     // API
     if (req.originalUrl.startsWith("/api")) {
@@ -36,6 +71,13 @@ const sendErrorDev = (err, req, res) => {
     }
 };
 
+/**
+ * Send limited error response in production environment.
+ * @function sendErrorProd
+ * @param {Object} err - The error object.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 const sendErrorProd = (err, req, res) => {
     // API
     if (req.originalUrl.startsWith("/api")) {
@@ -55,6 +97,14 @@ const sendErrorProd = (err, req, res) => {
     }
 };
 
+/**
+ * Global Error Handling Middleware.
+ * @function globalErrorHandler
+ * @param {Object} err - The error object.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ */
 const globalErrorHandler = (err, req, res, next) => {
     err.statusCode = err.statusCode || 500;
     err.status = err.status || "error";

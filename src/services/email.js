@@ -1,7 +1,19 @@
 import nodemailer from 'nodemailer';
 import { htmlToText } from 'html-to-text';
 
+/**
+ * Email Service Class to handle sending emails.
+ * @class Email
+ */
 export default class Email {
+    /**
+     * Create an Email instance.
+     * @constructor
+     * @param {Object} user - User object.
+     * @param {string} user.email - User's email address.
+     * @param {string} user.name - User's full name.
+     * @param {string} url - Action URL (e.g., reset link, verification link).
+     */
     constructor(user, url) {
         this.to = user.email;
         this.firstName = user.name.split(' ')[0] || 'User';
@@ -9,6 +21,10 @@ export default class Email {
         this.from = `Smart University <${process.env.EMAIL_FROM}>`;
     }
 
+    /**
+     * Create a new Nodemailer transport based on environment.
+     * @returns {Object} Nodemailer transport object.
+     */
     newTransport() {
         if (process.env.NODE_ENV === 'production') {
             // Brevo (Sendinblue) Configuration
@@ -34,6 +50,13 @@ export default class Email {
         });
     }
 
+    /**
+     * Send the actual email.
+     * @async
+     * @param {string} subject - Email subject.
+     * @param {string} message - Email HTML content.
+     * @returns {Promise<void>}
+     */
     async send(subject, message) {
         const mailOptions = {
             from: this.from,
@@ -46,6 +69,11 @@ export default class Email {
         await this.newTransport().sendMail(mailOptions);
     }
 
+    /**
+     * Send a welcome email to the user.
+     * @async
+     * @returns {Promise<void>}
+     */
     async sendWelcome() {
         await this.send(
             'Welcome to the Smart University Family!',
@@ -53,6 +81,11 @@ export default class Email {
         );
     }
 
+    /**
+     * Send a password reset email.
+     * @async
+     * @returns {Promise<void>}
+     */
     async sendPasswordReset() {
         await this.send(
             '🔒 Reset your password',
@@ -227,6 +260,13 @@ export default class Email {
         );
     }
 
+    /**
+     * Send a 2FA verification code email.
+     * @async
+     * @param {string} otpCode - The One-Time Password code.
+     * @param {string} [msg=""] - Context message (e.g., "Login", "Update Password").
+     * @returns {Promise<void>}
+     */
     async send2FACode(otpCode, msg = "") {
         await this.send(
             `🔒 Your ${msg} Verification Code`,

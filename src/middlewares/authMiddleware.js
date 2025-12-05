@@ -4,6 +4,10 @@ import User from '../../DB/models/userModel.js';
 import catchAsync from '../utils/catchAsync.js';
 import AppError from '../utils/appError.js';
 
+
+// ==============================
+// 1. Authentication Middleware
+// ==============================
 export const protect = catchAsync(async (req, res, next) => {
     let token;
 
@@ -53,3 +57,24 @@ export const protect = catchAsync(async (req, res, next) => {
     res.locals.user = currentUser;
     next();
 });
+
+
+// ==============================
+// 2. Authorization Middleware
+// ==============================
+
+/**
+ * 
+ * @param  {...any} roles 
+ * @returns 
+ */
+export const restrictTo = (...roles) => {
+    return (req, res, next) => {
+        if (!roles.includes(req.user.role)) {
+            return next(
+                new AppError('You do not have permission to perform this action', 403)
+            );
+        }
+        next();
+    };
+};

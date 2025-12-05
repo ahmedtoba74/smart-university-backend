@@ -16,6 +16,12 @@ if (!process.env.HASH_SECRET) {
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 const HASH_SECRET = process.env.HASH_SECRET;
 
+/**
+ * Encrypt a string using AES-256-CBC.
+ * @function encrypt
+ * @param {string} text - The text to encrypt.
+ * @returns {string|null} The encrypted string in format "iv:content" or null if input is invalid.
+ */
 export const encrypt = (text) => {
     if (!text) return null;
     
@@ -29,6 +35,12 @@ export const encrypt = (text) => {
     return iv.toString('hex') + ':' + encrypted.toString('hex');
 };
 
+/**
+ * Decrypt a string using AES-256-CBC.
+ * @function decrypt
+ * @param {string} text - The encrypted string in format "iv:content".
+ * @returns {string|null} The decrypted string or null if decryption fails.
+ */
 export const decrypt = (text) => {
     if (!text) return null;
 
@@ -49,6 +61,12 @@ export const decrypt = (text) => {
     }
 };
 
+/**
+ * Create a deterministic hash for searching purposes.
+ * @function hashForSearch
+ * @param {string} text - The text to hash.
+ * @returns {string|null} The SHA-256 hash or null if input is invalid.
+ */
 export const hashForSearch = (text) => {
     if (!text) return null;
 

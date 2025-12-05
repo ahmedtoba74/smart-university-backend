@@ -1,4 +1,15 @@
+/**
+ * Custom Error class for operational errors.
+ * @class AppError
+ * @extends Error
+ */
 class AppError extends Error {
+    /**
+     * Create an AppError.
+     * @constructor
+     * @param {string} message - Error message.
+     * @param {number} statusCode - HTTP status code.
+     */
     constructor(message, statusCode) {
         super(message);
         this.statusCode = statusCode;

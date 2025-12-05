@@ -1,3 +1,14 @@
+/**
+ * ===================================================================================
+ * @project   Smart University Platform
+ * @file      userModel.js
+ * @desc      Mongoose model for User entity. Handles identity, authentication, 
+ * encryption (Blind Indexing), RBAC, and security policies (Lockout, 2FA).
+ * @author    Ahmed Toba <ahmed.toba.mahmoud@gmail.com>
+ * @version   1.0.0
+ * ===================================================================================
+ */
+
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -5,6 +16,7 @@ import crypto from "crypto";
 import { encrypt, decrypt, hashForSearch } from "../../src/utils/cryptoUtils.js";
 
 const userSchema = new mongoose.Schema({
+    // --- Personal Information ---
     name: {
         type: String,
         required: [true, "Name is required"],
@@ -30,6 +42,8 @@ const userSchema = new mongoose.Schema({
             message: props => `${props.value} is not a valid email!`
         }
     },
+    /** * @field password - Stored as bcrypt hash. Never returned in queries by default.
+     */
     password: {
         type: String,
         required: [true, "Password is required"],
@@ -45,6 +59,7 @@ const userSchema = new mongoose.Schema({
         type: String,
         select: false 
     },
+    // --- Role & Identification ---
     role: {
         type: String,
         required: [true, "Role is required"],
@@ -53,13 +68,17 @@ const userSchema = new mongoose.Schema({
     rfidTag: {
         type: String,
         unique: true,
-        sparse: true, // For RFID-enabled users
+        sparse: true, // Allows null values for users without tags (e.g. admins)
         trim: true
     },
     photo: {
         type: String, // URL from Cloudinary
         default: "default_profile.jpg"
     },
+
+    // --- Secure National ID Strategy (Blind Indexing) ---
+    /** * @field nationalID - Two-way encrypted string. Used for display/retrieval only. Cannot be searched.
+     */
     nationalID: {
         type: String,
         required: [true, "National ID is required"],
@@ -71,6 +90,8 @@ const userSchema = new mongoose.Schema({
         //     message: props => `${props.value} is not a valid national ID!`
         // }
     },
+    /** * @field nationalIDHash - One-way deterministic hash. Used for searching and uniqueness enforcement.
+     */
     nationalIDHash: {
         type: String,
         unique: true,
@@ -88,11 +109,15 @@ const userSchema = new mongoose.Schema({
             message: props => `${props.value} is not a valid phone number!`
         }
     },
+
+    // --- Organizational Link ---
     department_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Department",
         // required: [true, "Department is required"]
     },
+
+    // --- Status & Logic ---
     active: {
         type: Boolean,
         default: true
@@ -115,7 +140,7 @@ const userSchema = new mongoose.Schema({
         default: 0
     },
 
-    // --- 2FA Fields ---
+    // --- Two-Factor Authentication (2FA) ---
     twoFactorSecret: {
         type: String,
         select: false
@@ -124,6 +149,7 @@ const userSchema = new mongoose.Schema({
         type: Date
     },
 
+    // --- Account Security Timestamps ---
     lastLoginAt: {
         type: Date,
         default: null
@@ -137,6 +163,15 @@ const userSchema = new mongoose.Schema({
     toObject: { virtuals: true }
 });
 
+// ===========================================
+// VIRTUALS
+// ===========================================
+
+/**
+ * Virtual property to decrypt National ID on the fly.
+ * Usage: user.realNationalID
+ * @returns {string|null} The decrypted National ID or null if decryption fails.
+ */
 userSchema.virtual('realNationalID').get(function() {
     if (!this.nationalID) return undefined;
     try {
@@ -146,6 +181,14 @@ userSchema.virtual('realNationalID').get(function() {
     }
 });
 
+// ===========================================
+// DOCUMENT MIDDLEWARE (HOOKS)
+// ===========================================
+
+/**
+ * Pre-save hook: Hash password and update `passwordChangedAt`.
+ * Runs only if password field is modified.
+ */
 userSchema.pre('save', async function(next) {
     if (!this.isModified('password')) return;
 
@@ -156,6 +199,11 @@ userSchema.pre('save', async function(next) {
     }
 });
 
+/**
+ * Pre-save hook: Handle National ID Security (Blind Indexing).
+ * 1. Hashes plain text for searchability (`nationalIDHash`).
+ * 2. Encrypts plain text for storage (`nationalID`).
+ */
 userSchema.pre('save', function() {
     if (!this.isModified('nationalID')) return;
     
@@ -166,15 +214,37 @@ userSchema.pre('save', function() {
     this.nationalID = encrypt(this.nationalID);
 });
 
+// ===========================================
+// QUERY MIDDLEWARE
+// ===========================================
 
+/**
+ * Pre-find hook: Filter out inactive users (Soft Delete implementation).
+ * Applies to all queries starting with 'find'.
+ */
 userSchema.pre(/^find/, function () {
+    if (this.options && this.options.skipActiveCheck) return;
     this.find({ active: { $ne: false } });
 });
 
+// ===========================================
+// INSTANCE METHODS
+// ===========================================
+
+/**
+ * Compares candidate password with stored hashed password.
+ * @param {string} candidatePassword - The password provided by user.
+ * @returns {Promise<boolean>} True if match, False otherwise.
+ */
 userSchema.methods.comparePassword = async function(candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
 };
 
+/**
+ * Checks if the user changed password after the JWT token was issued.
+ * @param {number} JWTTimestamp - The time the token was issued (iat).
+ * @returns {boolean} True if password was changed AFTER token issuance.
+ */
 userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
     if (this.passwordChangedAt) {
         const changedTimestamp = parseInt(
@@ -188,6 +258,11 @@ userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
     return false;
 };
 
+/**
+ * Generates a random reset token for password recovery.
+ * Hashes the token for storage and sets expiration.
+ * @returns {string} The unhashed reset token to be sent via email.
+ */
 userSchema.methods.createPasswordResetToken = function() {
     const resetToken = crypto.randomBytes(32).toString('hex');
 
@@ -202,11 +277,21 @@ userSchema.methods.createPasswordResetToken = function() {
     return resetToken;
 };
 
+/**
+ * Verifies the provided 2FA OTP against the stored hash.
+ * Uses constant-time comparison to prevent timing attacks.
+ * @param {string} candidateOTP - The OTP provided by the user.
+ * @returns {Promise<boolean>} True if valid.
+ */
 userSchema.methods.correctOTP = async function(candidateOTP) {
+    // Safety check
+    if (!this.twoFactorSecret) return false;
+    
     const hashedOTP = crypto.createHash('sha256').update(candidateOTP).digest('hex');
     const hashedOTPBuffer = Buffer.from(hashedOTP);
     const secretBuffer = Buffer.from(this.twoFactorSecret);
 
+    // Prevent Length Extension Attacks / Timing issues on length
     if (hashedOTPBuffer.length !== secretBuffer.length) {
         return false;
     }
@@ -214,6 +299,10 @@ userSchema.methods.correctOTP = async function(candidateOTP) {
     return crypto.timingSafeEqual(hashedOTPBuffer, secretBuffer);
 };
 
+/**
+ * Generates and stores a hashed 2FA secret (OTP).
+ * @param {string} otp - The plain 6-digit OTP code generated in controller.
+ */
 userSchema.methods.saveTwoFactorCode = function(otp) {
     this.twoFactorSecret = crypto
         .createHash('sha256')
@@ -222,6 +311,10 @@ userSchema.methods.saveTwoFactorCode = function(otp) {
     this.twoFactorExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
 };
 
+/**
+ * Checks if the stored 2FA code has expired.
+ * @returns {boolean} True if expired.
+ */
 userSchema.methods.isTwoFactorExpired = function() {
     return this.twoFactorExpires < Date.now();
 };

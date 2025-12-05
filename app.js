@@ -1,3 +1,31 @@
+/**
+ * ===================================================================================
+ * @project   Smart University Platform
+ * "Forging a Secure and Resilient Digital Backbone for a New Era of Academia"
+ * ===================================================================================
+ * @file      app.js
+ * @desc      The core application configuration and middleware setup.
+ * This Backend API serves as the central nervous system for the platform,
+ * integrating Authentication, Academic Management, LMS, and IoT Attendance.
+ * @version   1.0.0
+ * @date      2025-2026
+ * @author    Ahmed Toba <ahmed.toba.mahmoud@gmail.com> | Team Lead
+ * @team      Graduation Project Team - Faculty of Engineering, Beni-Suef University
+ * - Ahmed Toba (Backend)
+ * - Mahmoud Ahmed (Frontend)
+ * - Ahmed Shaban (Penetration Testing)
+ * - Rana Tamer (DevOps)
+ * - Hadeer Naser (DevOps)
+ * - Mahmoud Saleh (Network)
+ * - Adham Mahmoud (Network)
+ * @supervisors
+ * - Asst. Prof. Dr. Fathy El-Messiri
+ * - Dr. Mohamed Faysel El-Rawy
+ * @license   Proprietary - All Rights Reserved to Beni-Suef University
+ * @repository https://github.com/ahmedtoba74/smart-university-backend
+ * ===================================================================================
+ */
+
 import express from 'express';
 import dotenv from 'dotenv';
 
@@ -17,6 +45,26 @@ import authRouter from './src/modules/auth/authRouter.js';
 
 // Load env vars
 dotenv.config();
+
+// Validate essential environment variables
+const requiredEnvVars = [
+    'PORT', 
+    'DB_CONNECTION', 
+    'JWT_SECRET', 
+    'ENCRYPTION_KEY', 
+    'HASH_SECRET',
+    'EMAIL_HOST'
+];
+
+const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
+
+if (missingEnvVars.length > 0) {
+    console.error('################################################');
+    console.error('💥 FATAL ERROR: Missing Environment Variables:');
+    missingEnvVars.forEach(key => console.error(`   - ${key}`));
+    console.error('################################################');
+    process.exit(1);
+}
 
 const app = express();
 
@@ -94,6 +142,15 @@ app.get('/api/v1/test', (req, res) => {
     res.status(200).json({
         status: 'success',
         message: 'Test route'
+    });
+});
+
+// Health Check Route (For Azure/AWS Load Balancers)
+app.get('/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'UP', 
+        timestamp: new Date(),
+        uptime: process.uptime() // السيرفر شغال بقاله قد إيه
     });
 });
 

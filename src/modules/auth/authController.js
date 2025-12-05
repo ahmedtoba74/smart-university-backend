@@ -10,12 +10,26 @@ import { hashForSearch, encrypt, decrypt } from "../../utils/cryptoUtils.js";
 // 1) Helper Functions
 // ===========================================
 
+/**
+ * Sign a JWT token.
+ * @function signToken
+ * @param {string} id - User ID.
+ * @returns {string} Signed JWT token.
+ */
 const signToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
         expiresIn: process.env.JWT_EXPIRES_IN
     });
 };
 
+/**
+ * Create and send a token as a cookie and in the response.
+ * @function createSendToken
+ * @param {Object} user - User object.
+ * @param {number} statusCode - HTTP status code.
+ * @param {Object} res - Express response object.
+ * @param {string} [msg="Processed successfully"] - Success message.
+ */
 const createSendToken = (user, statusCode, res, msg = "Processed successfully") => {
     const token = signToken(user._id);
     const cookieOptions = {
@@ -38,6 +52,19 @@ const createSendToken = (user, statusCode, res, msg = "Processed successfully") 
     });
 };
 
+/**
+ * Handles login failure by updating user's login attempts and lockout stage.
+ * @param {User} user - The user object.
+ * @returns {Promise<void>}
+ * @throws {Error} If the user is not found.
+ */
+/**
+ * Handle login failure logic (lockout mechanism).
+ * @async
+ * @function handleLoginFailure
+ * @param {Object} user - User object.
+ * @returns {Promise<void>}
+ */
 async function handleLoginFailure(user) {
     user.loginAttempts += 1;
     let lockDuration = 0;
@@ -63,6 +90,19 @@ async function handleLoginFailure(user) {
 // 2) CONTROLLERS
 // ===========================================
 
+/**
+ * Step 1 of Login: Validate credentials and send 2FA OTP.
+ * @async
+ * @function loginStepOne
+ * @param {Object} req - Express request object.
+ * @param {Object} req.body - Request body.
+ * @param {string} req.body.email - User's email.
+ * @param {string} req.body.nationalID - User's national ID.
+ * @param {string} req.body.password - User's password.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ * @returns {Promise<void>} Sends a JSON response indicating 2FA code sent.
+ */
 export const loginStepOne = catchAsync(async (req, res, next) => {
     const {email, nationalID, password} = req.body;
     if (!email || !nationalID || !password) {
@@ -121,6 +161,18 @@ export const loginStepOne = catchAsync(async (req, res, next) => {
 })
 
 // 2. Login Step 2: Verify OTP & Issue Token
+/**
+ * Step 2 of Login: Verify OTP and issue JWT token.
+ * @async
+ * @function loginStepTwo
+ * @param {Object} req - Express request object.
+ * @param {Object} req.body - Request body.
+ * @param {string} req.body.email - User's email.
+ * @param {string} req.body.otp - One-Time Password.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ * @returns {Promise<void>} Sends a JSON response with the JWT token.
+ */
 export const loginStepTwo = catchAsync(async (req, res, next) => {
     const { email, otp } = req.body;
 
@@ -167,6 +219,20 @@ export const loginStepTwo = catchAsync(async (req, res, next) => {
     createSendToken(user, 200, res, "Logged in successfully");
 });
 
+/**
+ * Initiate password update process.
+ * @async
+ * @function initiateUpdatePassword
+ * @param {Object} req - Express request object.
+ * @param {Object} req.body - Request body.
+ * @param {string} req.body.currentPassword - Current password.
+ * @param {string} req.body.password - New password.
+ * @param {string} req.body.passwordConfirm - Confirm new password.
+ * @param {Object} req.user - Authenticated user object.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ * @returns {Promise<void>} Sends a JSON response indicating OTP sent.
+ */
 export const initiateUpdatePassword = catchAsync(async (req, res, next) => {
     const { currentPassword, password, passwordConfirm } = req.body;
     if (!currentPassword || !password || !passwordConfirm) {
@@ -208,6 +274,18 @@ export const initiateUpdatePassword = catchAsync(async (req, res, next) => {
     }
 });
 
+/**
+ * Confirm password update with OTP.
+ * @async
+ * @function confirmUpdatePassword
+ * @param {Object} req - Express request object.
+ * @param {Object} req.body - Request body.
+ * @param {string} req.body.otp - One-Time Password.
+ * @param {Object} req.user - Authenticated user object.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ * @returns {Promise<void>} Sends a JSON response confirming password update.
+ */
 export const confirmUpdatePassword = catchAsync(async (req, res, next) => {
     const { otp } = req.body;
     if (!otp) {
@@ -242,6 +320,18 @@ export const confirmUpdatePassword = catchAsync(async (req, res, next) => {
     createSendToken(user, 200, res, 'Password updated successfully');
 });
 
+/**
+ * Initiate forgot password process.
+ * @async
+ * @function forgotPassword
+ * @param {Object} req - Express request object.
+ * @param {Object} req.body - Request body.
+ * @param {string} req.body.email - User's email.
+ * @param {string} req.body.nationalID - User's national ID.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ * @returns {Promise<void>} Sends a JSON response indicating reset token sent.
+ */
 export const forgotPassword = catchAsync(async (req, res, next) => {
     const {email, nationalID} = req.body;
 
@@ -278,13 +368,26 @@ export const forgotPassword = catchAsync(async (req, res, next) => {
     }
 });
 
+/**
+ * Reset password using token.
+ * @async
+ * @function resetPassword
+ * @param {Object} req - Express request object.
+ * @param {Object} req.params - Request parameters.
+ * @param {string} req.params.token - Reset token.
+ * @param {Object} req.body - Request body.
+ * @param {string} req.body.password - New password.
+ * @param {string} req.body.passwordConfirm - Confirm new password.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ * @returns {Promise<void>} Sends a JSON response confirming password reset.
+ */
 export const resetPassword = catchAsync(async (req, res, next) => {
     const {password, passwordConfirm} = req.body;
 
     if (!password || !passwordConfirm) {
         return next(new AppError('Please provide password and passwordConfirm', 400));
     }
-
     if (password !== passwordConfirm) {
         return next(new AppError('Passwords do not match', 400));
     }
@@ -310,6 +413,15 @@ export const resetPassword = catchAsync(async (req, res, next) => {
     createSendToken(user, 200, res, 'Password reset successfully');
 });
 
+/**
+ * Logout user by clearing the JWT cookie.
+ * @async
+ * @function logout
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ * @returns {Promise<void>} Sends a JSON response confirming logout.
+ */
 export const logout = catchAsync(async (req, res, next) => {
     res.cookie('jwt', 'loggedout', {
         expires: new Date(Date.now() + 10 * 1000),
