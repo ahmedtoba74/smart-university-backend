@@ -8,6 +8,13 @@ import AppError from '../utils/appError.js';
 // ==============================
 // 1. Authentication Middleware
 // ==============================
+
+/**
+ * 
+ * @param {*} req 
+ * @param {*} res 
+ * @param {*} next 
+ */
 export const protect = catchAsync(async (req, res, next) => {
     let token;
 

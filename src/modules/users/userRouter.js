@@ -5,16 +5,18 @@ const router = express.Router();
 
 router.use(protect);
 
+// 'student', 'ta', 'doctor', 'collegeAdmin', 'universityAdmin'
+
 router.route("/me").get(userController.getMe);
 
 router.route("/")
-    .post(userController.createUser)
-    .get(userController.getAllUsers);
+    .post(restrictTo("universityAdmin", "collegeAdmin"), userController.createUser)
+    .get(restrictTo("universityAdmin", "collegeAdmin", "ta", "doctor"), userController.getAllUsers);
 
 router.route("/:id")
-    .get(userController.getUser)
-    .patch(userController.updateUser)
-    .delete(userController.deleteUser);
+    .get(restrictTo("universityAdmin", "collegeAdmin", "ta", "doctor"), userController.getUser)
+    .patch(restrictTo("universityAdmin", "collegeAdmin"), userController.updateUser)
+    .delete(restrictTo("universityAdmin", "collegeAdmin"), userController.deleteUser);
 
 
 export default router;

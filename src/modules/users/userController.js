@@ -120,15 +120,33 @@ export const getUser = catchAsync(async (req, res, next) => {
  * @param {Object} req.params - Request parameters.
  * @param {string} req.params.id - User ID.
  * @param {Object} req.body - Fields to update.
+ * @param {string} req.body.name - User's name.
+ * @param {string} req.body.email - User's email.
+ * @param {string} req.body.nationalID - User's national ID.
+ * @param {string} req.body.role - User's role.
+ * @param {string} req.body.department_id - User's department ID.
+ * @param {string} req.body.phoneNumber - User's phone number.
+ * @param {string} req.body.photo - User's photo URL.
  * @param {Object} res - Express response object.
  * @param {Function} next - Express next middleware function.
  * @returns {Promise<void>} Sends a JSON response with the updated user.
  */
 export const updateUser = catchAsync(async (req, res, next) => {
-    const user = await User.findByIdAndUpdate(req.params.id, req.body, {
-        new: true,
-        runValidators: true,
-    });
+    if (req.body.password || req.body.passwordConfirm) {
+        return next(new AppError("Password cannot be updated here", 400));
+    }
+    const { name, email, nationalID, role, department_id, phoneNumber, photo } = req.body;
+    const user = await User.findById(req.params.id);
+    user.name = name;
+    user.email = email;
+    user.nationalID = nationalID;
+    user.role = role;
+    user.department_id = department_id;
+    user.phoneNumber = phoneNumber;
+    user.photo = photo;
+
+    await user.save();
+
     user.password = undefined;
     res.status(201).json({
         status: "success",

@@ -1,4 +1,13 @@
+/**
+ * APIFeatures class for handling API query features.
+ * @class
+ */
 class APIFeatures {
+    /**
+     * Constructor for APIFeatures.
+     * @param {Object} query - Mongoose query object.
+     * @param {Object} queryString - Query string object.
+     */
     constructor(query, queryString) {
         this.query = query;
         this.queryString = queryString;
@@ -8,7 +17,7 @@ class APIFeatures {
         // 1A) Filtering
         // eslint-disable-next-line node/no-unsupported-features/es-syntax
         const queryObj = { ...this.queryString };
-        const excludedFields = ["page", "sort", "limit", "fields"];
+        const excludedFields = ["page", "sort", "limit", "fields", "includeDeleted"];
         excludedFields.forEach((el) => delete queryObj[el]);
 
         // 1B) Advanced filtering

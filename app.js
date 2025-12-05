@@ -39,6 +39,7 @@ import compression from 'compression';
 import AppError from './src/utils/appError.js';
 import globalErrorHandler from './src/utils/errorHandler.js';
 import sanitizer from 'perfect-express-sanitizer';
+import toobusy from 'toobusy-js';
 
 import userRouter from './src/modules/users/userRouter.js';
 import authRouter from './src/modules/auth/authRouter.js';
@@ -71,6 +72,18 @@ const app = express();
 // ===========================================
 // 1) GLOBAL CONFIGURATION & SECURITY
 // ===========================================
+
+// Prevent server overload
+app.use(function(req, res, next) {
+  if (toobusy()) {
+    // 503 Service Unavailable
+    return res.status(503).json({
+        status: 'error',
+        message: 'Server is too busy right now, please try again later.'
+    });
+  }
+  next();
+});
 
 // Trust proxy
 app.enable('trust proxy');
