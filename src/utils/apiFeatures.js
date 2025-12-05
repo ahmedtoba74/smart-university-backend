@@ -65,4 +65,4 @@ class APIFeatures {
     }
 }
 
-export { APIFeatures };
+export default APIFeatures ;

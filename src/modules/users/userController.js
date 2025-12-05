@@ -1,5 +1,9 @@
 import User from "../../../DB/models/userModel.js";
 import catchAsync from "../../utils/catchAsync.js";
+import APIFeatures from "../../utils/apiFeatures.js";
+import AppError from "../../utils/appError.js";
+import { uploadToCloudinary } from "../../utils/uploadHelper.js";
+import { hashForSearch } from '../../utils/cryptoUtils.js';
 
 /**
  * Create a new user.
@@ -36,6 +40,18 @@ export const createUser = catchAsync(async (req, res, next) => {
         return next(new AppError("Invalid national ID", 400));
     }
 
+    let photoUrl = "default_profile.jpg";
+
+    if (req.files && req.files.photo) {
+        const photoFile = req.files.photo[0];
+        try {
+            const result = await uploadToCloudinary(photoFile.buffer, "users/profiles");
+            photoUrl = result.secure_url;
+        } catch (error) {
+            return next(new AppError("Failed to upload photo", 500));
+        }
+    }
+
     const user = await User.create(
         {
             name, 
@@ -45,7 +61,7 @@ export const createUser = catchAsync(async (req, res, next) => {
             role, 
             department_id, 
             phoneNumber, 
-            photo 
+            photo: photoUrl
         }
     );
     user.password = undefined;
@@ -103,7 +119,18 @@ export const getAllUsers = catchAsync(async (req, res, next) => {
  * @returns {Promise<void>} Sends a JSON response with the user details.
  */
 export const getUser = catchAsync(async (req, res, next) => {
-    const user = await User.findById(req.params.id);
+    let query = User.findById(req.params.id);
+    if (req.query.includeDeleted === 'true') {
+        query = query.setOptions({ skipActiveCheck: true });
+    }
+    const user = await query
+        .select('+nationalID')
+        .populate('department_id');
+    
+    if (!user) {
+        return next(new AppError("User not found", 404));
+    }
+    user.password = undefined;
     res.status(200).json({
         status: "success",
         data: {
@@ -135,15 +162,30 @@ export const updateUser = catchAsync(async (req, res, next) => {
     if (req.body.password || req.body.passwordConfirm) {
         return next(new AppError("Password cannot be updated here", 400));
     }
-    const { name, email, nationalID, role, department_id, phoneNumber, photo } = req.body;
+
     const user = await User.findById(req.params.id);
-    user.name = name;
-    user.email = email;
-    user.nationalID = nationalID;
-    user.role = role;
-    user.department_id = department_id;
-    user.phoneNumber = phoneNumber;
-    user.photo = photo;
+    if (!user) {
+        return next(new AppError("User not found", 404));
+    }
+
+    // Handle Photo Upload
+    if (req.files && req.files.photo) {
+        const photoFile = req.files.photo[0];
+        try {
+            const result = await uploadToCloudinary(photoFile.buffer, "users/profiles");
+            user.photo = result.secure_url; // Update req.body with the new URL
+        } catch (error) {
+            return next(new AppError("Failed to upload photo", 500));
+        }
+    }
+
+    const allowedFields = ['name', 'email', 'nationalID', 'role', 'department_id', 'phoneNumber', 'active'];
+    
+    Object.keys(req.body).forEach(key => {
+        if (allowedFields.includes(key) && req.body[key] !== undefined) {
+            user[key] = req.body[key];
+        }
+    });
 
     await user.save();
 
@@ -172,12 +214,9 @@ export const deleteUser = catchAsync(async (req, res, next) => {
     if (!user) {
         return next(new AppError("User not found", 404));
     }
-    res.status(201).json({
+    res.status(204).json({
         status: "success",
-        message: "User deactivated successfully",
-        data: {
-            user,
-        },
+        data: null,
     });
 });
 
@@ -195,6 +234,39 @@ export const getMe = (req, res, next) => {
     req.params.id = req.user.id;
     next();
 };
+
+export const restoreUserByNationalID = catchAsync(async (req, res, next) => {
+    const nationalID = req.body.nationalID;
+    if (!nationalID) {
+        return next(new AppError("National ID is required", 400));
+    }
+    const hashedID = hashForSearch(nationalID);
+    const user = await User.findOne({ nationalIDHash: hashedID })
+        .setOptions({ skipActiveCheck: true });
+
+    if (!user) {
+        return next(new AppError("No user found with this National ID.", 404));
+    }
+
+    if (user.active) {
+        return next(new AppError("User is already active!", 400));
+    }
+    user.active = true;
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+        status: "success",
+        message: "User restored successfully.",
+        data: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            department_id: user.department_id,
+            phoneNumber: user.phoneNumber,
+            photo: user.photo,
+        }
+    });
+});
 
 
 

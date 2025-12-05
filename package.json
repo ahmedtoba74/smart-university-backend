@@ -14,6 +14,7 @@
   "description": "",
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.8.0",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -27,6 +28,8 @@
     "html-to-text": "^9.0.5",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.0.0",
+    "multer": "^2.0.2",
+    "nanoid": "^5.1.6",
     "nodemailer": "^7.0.11",
     "perfect-express-sanitizer": "^2.0.2",
     "toobusy-js": "^0.5.1",

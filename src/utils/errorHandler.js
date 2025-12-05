@@ -1,4 +1,5 @@
 import AppError from "./appError.js";
+import multer from "multer";
 
 /**
  * Handle MongoDB CastError (invalid ID).
@@ -51,6 +52,22 @@ const handleJWTError = () =>
  */
 const handleJWTExpiredError = () =>
     new AppError("Your token has expired! Please log in again.", 401);
+
+/**
+ * Handle Multer Error (file upload issues).
+ * @function handleMulterError
+ * @param {Object} err - The error object.
+ * @returns {AppError} Operational error with 400 status.
+ */
+const handleMulterError = (err) => {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+        return new AppError('File is too large! Maximum limit is 50MB.', 400);
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return new AppError('Too many files uploaded or invalid field name.', 400);
+    }
+    return new AppError(err.message, 400);
+};
 
 /**
  * Send detailed error response in development environment.
@@ -121,6 +138,7 @@ const globalErrorHandler = (err, req, res, next) => {
         if (error.name === "ValidationError") error = handleValidationErrorDB(error);
         if (error.name === "JsonWebTokenError") error = handleJWTError();
         if (error.name === "TokenExpiredError") error = handleJWTExpiredError();
+        if (error.name === "MulterError") error = handleMulterError(error);
 
         sendErrorProd(error, req, res);
     }
