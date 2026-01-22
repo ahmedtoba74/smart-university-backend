@@ -1,20 +1,30 @@
 import mongoose from "mongoose";
 
 const settingsSchema = new mongoose.Schema({
+    currentAcademicYear: {
+        type: String,
+        required: true,
+        default: "2025-2026"
+    },
+
     currentSemester: {
         type: String,
         required: true,
-        default: "Fall 2025"
+        enum: ['First', 'Second', 'Summer'], 
+        default: 'First'
     },
+
     isEnrollmentOpen: {
         type: Boolean,
         default: false
     },
+
     gradePoints: {
         type: Map,
         of: Number,
         default: { 'A+': 4.0, 'A': 3.7, 'B+': 3.3, 'B': 3.0, 'C+': 2.7, 'C': 2.4, 'D+': 2.2, 'D': 2.0, 'F': 0.0 }
     },
+
     defaultCreditLimit: {
         good_standing: { type: Number, default: 18 },
         probation: { type: Number, default: 12 },

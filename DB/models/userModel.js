@@ -117,6 +117,23 @@ const userSchema = new mongoose.Schema({
         // required: [true, "Department is required"]
     },
 
+    // --- Student Academic Info (بيانات الطالب الأكاديمية) ---
+    level: {
+        type: Number,
+        enum: [1, 2, 3, 4, 5], 
+        default: 1
+    },
+    gpa: {
+        type: Number,
+        min: 0,
+        max: 4.0,
+        default: 0.0
+    },
+    earnedCredits: { 
+        type: Number,
+        default: 0
+    },
+
     // --- Status & Logic ---
     active: {
         type: Boolean,
