@@ -62,8 +62,8 @@ const userSchema = new mongoose.Schema({
     // --- Role & Identification ---
     role: {
         type: String,
-        required: [true, "Role is required"],
-        enum: ['student', 'ta', 'doctor', 'collegeAdmin', 'universityAdmin']
+        enum: ['student', 'ta', 'doctor', 'collegeAdmin', 'universityAdmin'],
+        default: 'student'
     },
     rfidTag: {
         type: String,
