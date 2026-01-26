@@ -81,5 +81,17 @@ const courseOfferingSchema = new mongoose.Schema({
 // Compound index for efficient querying
 courseOfferingSchema.index({ semester: 1, course_id: 1 }, { unique: true });
 
+courseOfferingSchema.pre('validate', function(next) {
+    if (this.schedule) {
+        for (const session of this.schedule) {
+            if (session.startTime >= session.endTime) {
+                this.invalidate('schedule', `Start time (${session.startTime}) must be before End time (${session.endTime})`);
+            }
+        }
+    }
+    next();
+});
+
+
 const CourseOffering = mongoose.model("CourseOffering", courseOfferingSchema);
 export default CourseOffering;
