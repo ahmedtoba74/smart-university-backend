@@ -23,7 +23,7 @@ const attendanceSessionSchema = new mongoose.Schema({
     expiresAt: {
         type: Date,
         required: [true, "Expiration time is required"],
-        index: { expireAfterSeconds: 0 } // TTL Index for auto-deletion if needed, or just for query optimization
+        index: { expireAfterSeconds: 0 } 
     }
 }, { timestamps: true });
 
