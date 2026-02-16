@@ -28,6 +28,7 @@
 
 import express from 'express';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
@@ -88,12 +89,25 @@ app.use(function(req, res, next) {
 // Trust proxy
 app.enable('trust proxy');
 
-// Enable CORS
+// Enable CORS – allow frontend origin (localhost in dev, FRONTEND_URL in prod)
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    'http://127.0.0.1:5173',
+];
+if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+}
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production' 
-        ? 'https://your-frontend-domain.com' 
-        : true, 
-    credentials: true 
+    origin: (origin, cb) => {
+        if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+        if (process.env.NODE_ENV !== 'production') return cb(null, true);
+        return cb(null, false);
+    },
+    credentials: true,
 }));
 
 // Secure app by setting headers
@@ -104,12 +118,12 @@ if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
 }
 
-// Limit requests from same API
+// Limit requests from same API (relaxed in development to avoid 429 while testing)
 const limiter = rateLimit({
     windowMs: 10 * 60 * 1000,
-    max: 100,
+    max: process.env.NODE_ENV === 'development' ? 500 : 100,
     message: 'Too many requests from this IP, please try again after 10 minutes',
-    standardHeaders: true, 
+    standardHeaders: true,
     legacyHeaders: false,
     validate: { trustProxy: false }
 });
@@ -150,7 +164,22 @@ app.use(cookieParser());
 // 3) ROUTES & ERROR HANDLING
 // ===========================================
 
-// Test router
+// API info routes (no auth, for health/debug)
+const apiInfoRouter = express.Router();
+apiInfoRouter.get('/test', (req, res) => {
+    res.status(200).json({ message: 'Backend working' });
+});
+apiInfoRouter.get('/db-info', (req, res) => {
+    const db = mongoose.connection?.db;
+    res.status(200).json({
+        connected: mongoose.connection.readyState === 1,
+        databaseName: db?.databaseName ?? null,
+        host: mongoose.connection?.host ?? null,
+    });
+});
+app.use('/api', apiInfoRouter);
+
+// Test router (v1)
 app.get('/api/v1/test', (req, res) => {
     res.status(200).json({
         status: 'success',
@@ -158,12 +187,18 @@ app.get('/api/v1/test', (req, res) => {
     });
 });
 
-// Health Check Route (For Azure/AWS Load Balancers)
+// Health Check Route (For Azure/AWS Load Balancers) – includes DB info
 app.get('/health', (req, res) => {
+    const db = mongoose.connection?.db;
     res.status(200).json({ 
         status: 'UP', 
         timestamp: new Date(),
-        uptime: process.uptime() // السيرفر شغال بقاله قد إيه
+        uptime: process.uptime(),
+        database: {
+            connected: mongoose.connection.readyState === 1,
+            name: db?.databaseName ?? null,
+            host: mongoose.connection?.host ?? null,
+        }
     });
 });
 
