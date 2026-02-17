@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
@@ -7,11 +7,26 @@ on:
     branches: [ "main", "master" ]
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Backend Image
-        run: docker build -t smart-backend ./
+    
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and Push Backend Image
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/smart-backend:${{ github.sha }} ./
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/smart-backend:${{ github.sha }}
+          
+      - name: Tag as latest and Push
+        run: |
+          docker tag ${{ secrets.ACR_LOGIN_SERVER }}/smart-backend:${{ github.sha }} ${{ secrets.ACR_LOGIN_SERVER }}/smart-backend:latest
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/smart-backend:latest
