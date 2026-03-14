@@ -278,7 +278,6 @@ export default class Email {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Verification Code</title>
                 <style>
-                    /* نفس الـ Styles بالظبط عشان التناسق */
                     body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
                     table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
                     img { -ms-interpolation-mode: bicubic; }

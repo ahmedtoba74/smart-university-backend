@@ -11,7 +11,7 @@ const collegeSchema = new mongoose.Schema({
         type: String,
         required: [true, "College code is required"],
         unique: true,
-        lowercase: true,
+        uppercase: true,
         trim: true
     },
     description: {
@@ -20,18 +20,39 @@ const collegeSchema = new mongoose.Schema({
     },
     dean_id: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        required: [true, "Dean is required"]
+        ref: "User"
     },
-    department_ids: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Department",
-    }],
+    establishedYear: {
+        type: Number
+    },
+    /**
+     * Uni-directional relationship: College does NOT store department IDs.
+     * Departments are fetched via: Department.find({ college_id: collegeId })
+     * This avoids array sync issues and keeps a single source of truth.
+     */
     isArchived: {
         type: Boolean,
         default: false
     }
 }, { timestamps: true });
+
+// ============================================
+// QUERY MIDDLEWARE
+// ============================================
+
+/**
+ * Automatically excludes archived colleges from all queries.
+ * Uses array syntax to cover countDocuments (fixes pagination totals).
+ * To bypass: explicitly set isArchived in the filter, e.g. { isArchived: true }.
+ */
+collegeSchema.pre(
+    ['find', 'findOne', 'findOneAndUpdate', 'findOneAndDelete', 'countDocuments'],
+    function () {
+        if (this.getFilter().isArchived === undefined) {
+            this.where({ isArchived: false });
+        }
+    }
+);
 
 const College = mongoose.model("College", collegeSchema);
 export default College;

@@ -44,6 +44,10 @@ import toobusy from 'toobusy-js';
 
 import userRouter from './src/modules/users/userRouter.js';
 import authRouter from './src/modules/auth/authRouter.js';
+import collegeRouter from './src/modules/colleges/collegeRouter.js';
+import departmentRouter from './src/modules/departments/departmentRouter.js';
+import settingsRouter from './src/modules/settings/settingsRouter.js';
+import locationRouter from './src/modules/locations/locationRouter.js';
 
 // Load env vars
 dotenv.config();
@@ -91,7 +95,6 @@ app.enable('trust proxy');
 
 // Enable CORS – allow frontend origin (localhost in dev, FRONTEND_URL in prod)
 const allowedOrigins = [
-    'https://frontwebapp-fshqdheshabmc4dh.westus-01.azurewebsites.net',
     'https://frontwebapp-fshqdheshabmc4dh.westus-01.azurewebsites.net',
     'http://localhost:3000',
     'http://localhost:3001',
@@ -178,7 +181,7 @@ apiInfoRouter.get('/db-info', (req, res) => {
         databaseName: db?.databaseName ?? null,
         host: mongoose.connection?.host ?? null,
     });
-});
+}); 
 app.use('/api', apiInfoRouter);
 
 // Test router (v1)
@@ -206,6 +209,12 @@ app.get('/health', (req, res) => {
 
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/auth', authRouter);
+
+// Phase 1 — Organizational Core
+app.use('/api/v1/colleges',    collegeRouter);
+app.use('/api/v1/departments', departmentRouter);
+app.use('/api/v1/settings',    settingsRouter);
+app.use('/api/v1/locations',   locationRouter);
 
 // Handle Unhandled Routes
 app.all(/(.*)/, (req, res, next) => {

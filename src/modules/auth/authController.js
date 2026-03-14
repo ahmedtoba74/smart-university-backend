@@ -153,10 +153,11 @@ export const loginStepOne = catchAsync(async (req, res, next) => {
             message: '2FA Code sent to your email.'
         });
     } catch (err) {
+        console.error('❌ [loginStepOne] Email Error:', err);
         user.twoFactorSecret = undefined;
         user.twoFactorExpires = undefined;
         await user.save({ validateBeforeSave: false });
-        return next(new AppError('Error sending email. Try again!', 500));
+        return next(new AppError(`Error sending email. Try again!`, 500));
     }
 })
 
@@ -270,7 +271,7 @@ export const initiateUpdatePassword = catchAsync(async (req, res, next) => {
         user.twoFactorSecret = undefined;
         user.twoFactorExpires = undefined;
         await user.save({ validateBeforeSave: false });
-        return next(new AppError('Error sending email. Try again!', 500));
+        return next(new AppError(`Error sending email. Try again!`, 500));
     }
 });
 

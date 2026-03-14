@@ -10,10 +10,11 @@ import AppError from '../utils/appError.js';
 // ==============================
 
 /**
- * 
- * @param {*} req 
- * @param {*} res 
- * @param {*} next 
+ * Verifies the JWT token and attaches the authenticated user to req.user.
+ * Also enforces:
+ *  - Single-session: blocks old tokens when a newer login exists.
+ *  - Password rotation: blocks tokens issued before a password change.
+ *  - Temporary password: forces the user to update before any other action.
  */
 export const protect = catchAsync(async (req, res, next) => {
     let token;
@@ -41,6 +42,8 @@ export const protect = catchAsync(async (req, res, next) => {
             new AppError('The user belonging to this token no longer exists.', 401)
         );
     }
+
+    // Single-session guard: a newer login invalidates all older tokens
     if (currentUser.lastLoginAt) {
         const lastLoginTimestamp = parseInt(currentUser.lastLoginAt.getTime() / 1000, 10);
         if (lastLoginTimestamp > decoded.iat) {
@@ -50,14 +53,31 @@ export const protect = catchAsync(async (req, res, next) => {
         }
     }
 
-    // Check if user changed password after the token was issued
+    // Password rotation guard: token issued before password change is invalid
     if (currentUser.changedPasswordAfter(decoded.iat)) {
         return next(
             new AppError(
-                "User recently changed password! Please log in again.",
+                'User recently changed password! Please log in again.',
                 401,
             ),
         );
+    }
+
+    // Temporary password guard: admin-generated passwords must be changed immediately.
+    // Only the updatePassword and resetPassword routes are allowed through.
+    if (currentUser.requiresPasswordChange) {
+        const isPasswordRoute =
+            req.path.includes('/updatePassword') ||
+            req.path.includes('/resetPassword');
+
+        if (!isPasswordRoute) {
+            return next(
+                new AppError(
+                    'You must change your temporary password before continuing. Please use PATCH /api/v1/auth/updatePassword.',
+                    403
+                )
+            );
+        }
     }
 
     req.user = currentUser;
@@ -71,9 +91,9 @@ export const protect = catchAsync(async (req, res, next) => {
 // ==============================
 
 /**
- * 
- * @param  {...any} roles 
- * @returns 
+ * Restricts access to users whose role is in the provided list.
+ * Must be used after `protect`.
+ * @param  {...string} roles - Allowed roles.
  */
 export const restrictTo = (...roles) => {
     return (req, res, next) => {
@@ -84,4 +104,44 @@ export const restrictTo = (...roles) => {
         }
         next();
     };
+};
+
+
+// ==============================
+// 3. College Scope Middleware
+// ==============================
+
+/**
+ * Hybrid Scoping: Injects `req.scopeFilter` based on the user's role.
+ *
+ * - universityAdmin : no filter → sees everything
+ * - collegeAdmin    : scoped to their own college_id
+ * - other roles     : impossible filter → returns nothing (safety net)
+ *
+ * Usage: place after `protect` on any admin router.
+ * Controllers use `req.scopeFilter` directly in READ queries.
+ * WRITE operations must additionally perform an ownership check.
+ */
+export const attachCollegeScope = (req, res, next) => {
+    if (req.user.role === 'universityAdmin') {
+        req.scopeFilter = {};
+        return next();
+    }
+
+    if (req.user.role === 'collegeAdmin') {
+        if (!req.user.college_id) {
+            return next(
+                new AppError(
+                    'Your account is not linked to any college. Please contact the system administrator.',
+                    403
+                )
+            );
+        }
+        req.scopeFilter = { college_id: req.user.college_id };
+        return next();
+    }
+
+    // Safety net: any other role that somehow reaches an admin route
+    req.scopeFilter = { _id: null };
+    next();
 };

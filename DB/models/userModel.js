@@ -114,7 +114,15 @@ const userSchema = new mongoose.Schema({
     department_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Department",
-        // required: [true, "Department is required"]
+    },
+    /**
+     * @field college_id - Direct college reference for fast scoping of collegeAdmin queries.
+     * Avoids the department → college join on every admin request.
+     */
+    college_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "College",
+        index: true
     },
 
     // --- Student Academic Info (بيانات الطالب الأكاديمية) ---
@@ -138,6 +146,14 @@ const userSchema = new mongoose.Schema({
     active: {
         type: Boolean,
         default: true
+    },
+    /**
+     * @field requiresPasswordChange - Set to true when admin generates a temp password.
+     * The protect middleware will block all requests until the user changes their password.
+     */
+    requiresPasswordChange: {
+        type: Boolean,
+        default: false
     },
     academicStatus: {
         type: String,

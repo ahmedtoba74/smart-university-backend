@@ -6,6 +6,17 @@ const courseOfferingSchema = new mongoose.Schema({
         ref: "CourseCatalog",
         required: [true, "Course Catalog ID is required"]
     },
+    /**
+     * @field college_id - Denormalized from course_id → department → college for fast scoping.
+     * Set automatically by the controller when creating a new offering.
+     * Allows a single-query filter: CourseOffering.find({ college_id }) for collegeAdmin.
+     */
+    college_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "College",
+        required: [true, "College ID is required"],
+        index: true
+    },
     semester: {
         type: String,
         required: [true, "Semester is required"],
@@ -71,6 +82,23 @@ const courseOfferingSchema = new mongoose.Schema({
         assignments: { type: Number, default: 0 },
         project: { type: Number, default: 0 },
         finalExam: { type: Number, default: 0 }
+    },
+    /**
+     * @field semesterWorkLocked - Set to true when doctor clicks "Submit Semester Work".
+     * Once locked, no further edits to midterm/assignments/attendance grades are allowed.
+     * The finalExam grade (entered by collegeAdmin/Kontrol) is unaffected.
+     */
+    semesterWorkLocked: {
+        type: Boolean,
+        default: false
+    },
+    /**
+     * @field resultsPublished - Set to true by collegeAdmin after GPA calculation is complete.
+     * Controls visibility: students cannot see finalTotal or finalLetter until this is true.
+     */
+    resultsPublished: {
+        type: Boolean,
+        default: false
     },
     isArchived: {
         type: Boolean,

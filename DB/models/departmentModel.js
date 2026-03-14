@@ -33,5 +33,23 @@ const departmentSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+// ============================================
+// QUERY MIDDLEWARE
+// ============================================
+
+/**
+ * Automatically excludes archived departments from all queries.
+ * Uses array syntax to cover countDocuments (fixes pagination totals).
+ * To bypass: explicitly set isArchived in the filter, e.g. { isArchived: true }.
+ */
+departmentSchema.pre(
+    ['find', 'findOne', 'findOneAndUpdate', 'findOneAndDelete', 'countDocuments'],
+    function () {
+        if (this.getFilter().isArchived === undefined) {
+            this.where({ isArchived: false });
+        }
+    }
+);
+
 const Department = mongoose.model("Department", departmentSchema);
 export default Department;
