@@ -39,13 +39,13 @@ router.patch(
 // ─── Archive / Restore ─────────────────────────────────────────────────────
 router.patch(
     '/:id/archive',
-    restrictTo('universityAdmin', 'collegeAdmin'),
+    restrictTo('universityAdmin'),
     locationController.archiveLocation
 );
 
 router.patch(
     '/:id/restore',
-    restrictTo('universityAdmin'),
+    restrictTo('universityAdmin', 'collegeAdmin'),
     locationController.restoreLocation
 );
 

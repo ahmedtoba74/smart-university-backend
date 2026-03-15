@@ -27,14 +27,16 @@ export const getAllLocations = catchAsync(async (req, res, next) => {
     if (!applyIsArchivedGuard(req, next)) return;
     if (!applyFieldsGuard(req, next)) return;
 
+    const baseFilter = { ...req.scopeFilter, ...req.archivedFilter };
+
     const features = new APIFeatures(
-        Location.find(req.scopeFilter).populate('college_id', 'name'),
+        Location.find(baseFilter).populate('college_id', 'name'),
         req.query
     ).filter().sort().limitFields().paginate();
 
     const [locations, totalResults] = await Promise.all([
         features.query,
-        features.countTotal(Location, req.scopeFilter)
+        features.countTotal(Location, baseFilter)
     ]);
 
     res.status(200).json({
@@ -56,11 +58,7 @@ export const getLocation = catchAsync(async (req, res, next) => {
     if (!applyIsArchivedGuard(req, next)) return;
     if (!applyFieldsGuard(req, next)) return;
 
-    const filter = { _id: req.params.id, ...req.scopeFilter };
-
-    if (req.query.isArchived === 'true') {
-        filter.isArchived = true;
-    }
+    const filter = { _id: req.params.id, ...req.scopeFilter, ...req.archivedFilter };
 
     const location = await Location.findOne(filter).populate('college_id', 'name code');
 
@@ -209,8 +207,8 @@ export const updateLocationStatus = catchAsync(async (req, res, next) => {
  * Note: CourseOffering is a Phase 3 model — safe dynamic import pattern.
  */
 export const archiveLocation = catchAsync(async (req, res, next) => {
-    const filter = buildOwnershipFilter(req.params.id, req.user);
-    const location = await Location.findOne(filter);
+    // universityAdmin only (enforced in router) — no ownership filter needed
+    const location = await Location.findById(req.params.id);
     if (!location) return next(new AppError('Location not found.', 404));
 
     // Guard: block if location is in use in any active course offering
@@ -238,19 +236,30 @@ export const archiveLocation = catchAsync(async (req, res, next) => {
 
 /**
  * PATCH /api/v1/locations/:id/restore
- * universityAdmin only (enforced in router).
+ * universityAdmin and collegeAdmin only (enforced in router).
  * Uses findOneAndUpdate with explicit isArchived:true to bypass the pre-hook.
  */
 export const restoreLocation = catchAsync(async (req, res, next) => {
-    const location = await Location.findOneAndUpdate(
-        { _id: req.params.id, isArchived: true },
-        { isArchived: false },
-        { new: true, runValidators: false }
-    );
-
+    // Step 1: Find the archived location — do NOT update yet
+    const filter = buildOwnershipFilter(req.params.id, req.user);
+    const location = await Location.findOne({ ...filter, isArchived: true });
     if (!location) {
         return next(new AppError('Location not found or is already active.', 404));
     }
+
+    // Step 2: Verify parent college is NOT archived before restoring
+    // College pre-hook: findById returns null if college is archived
+    const parentCollege = await College.findById(location.college_id).select('_id');
+    if (!parentCollege) {
+        return next(new AppError(
+            'Cannot restore this location. Its parent college is archived. Restore the college first.',
+            400
+        ));
+    }
+
+    // Step 3: Safe to restore now
+    location.isArchived = false;
+    await location.save({ validateBeforeSave: false });
 
     res.status(200).json({ status: 'success', data: { location } });
 });

@@ -32,14 +32,16 @@ export const getAllDepartments = catchAsync(async (req, res, next) => {
     if (!applyIsArchivedGuard(req, next)) return;
     if (!applyFieldsGuard(req, next)) return;
 
+    const baseFilter = { ...req.scopeFilter, ...req.archivedFilter };
+
     const features = new APIFeatures(
-        Department.find(req.scopeFilter).populate('head_id', 'name email').populate('college_id', 'name code'),
+        Department.find(baseFilter).populate('head_id', 'name email').populate('college_id', 'name code'),
         req.query
     ).filter().sort().limitFields().paginate();
 
     const [departments, totalResults] = await Promise.all([
         features.query,
-        features.countTotal(Department, req.scopeFilter)
+        features.countTotal(Department, baseFilter)
     ]);
 
     res.status(200).json({
@@ -61,13 +63,8 @@ export const getDepartment = catchAsync(async (req, res, next) => {
     if (!applyIsArchivedGuard(req, next)) return;
     if (!applyFieldsGuard(req, next)) return;
 
-    // Merge _id with scopeFilter — collegeAdmin is automatically scoped
-    const filter = { _id: req.params.id, ...req.scopeFilter };
-
-    // Allow viewing an archived department if admin explicitly requests it
-    if (req.query.isArchived === 'true') {
-        filter.isArchived = true;
-    }
+    // Merge _id + scopeFilter + archivedFilter
+    const filter = { _id: req.params.id, ...req.scopeFilter, ...req.archivedFilter };
 
     const department = await Department.findOne(filter)
         .populate('head_id', 'name email role')

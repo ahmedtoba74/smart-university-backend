@@ -54,13 +54,14 @@ export const createUser = catchAsync(async (req, res, next) => {
 
     const user = await User.create(
         {
-            name, 
-            email, 
-            password, 
-            nationalID, 
-            role, 
-            department_id, 
-            phoneNumber, 
+            name,
+            email,
+            password,
+            nationalID,
+            role,
+            college_id: req.body.college_id,
+            department_id,
+            phoneNumber,
             photo: photoUrl
         }
     );
@@ -179,22 +180,37 @@ export const updateUser = catchAsync(async (req, res, next) => {
         }
     }
 
-    const allowedFields = ['name', 'email', 'nationalID', 'role', 'department_id', 'phoneNumber', 'active'];
-    
+    // [SECURITY] Whitelist — gpa and earnedCredits are system-computed (Gradebook Phase 3).
+    // Never allow manual override — that would be academic fraud.
+    // level can be set by universityAdmin only (managed separately if needed).
+    const allowedFields = [
+        'name', 'email', 'nationalID', 'role',
+        'department_id', 'phoneNumber', 'active',
+        'college_id', 'level'
+    ];
+
     Object.keys(req.body).forEach(key => {
         if (allowedFields.includes(key) && req.body[key] !== undefined) {
             user[key] = req.body[key];
         }
     });
 
+    // [BUSINESS LOGIC] If college_id changed, department_id must be reset or re-validated.
+    // Leaving an old department_id pointing to the previous college creates DB inconsistency.
+    if (req.body.college_id && req.body.college_id.toString() !== user.college_id?.toString()) {
+        if (!req.body.department_id) {
+            // college changed but no new department provided — clear old one
+            user.department_id = undefined;
+        }
+        // If req.body.department_id was also provided, it's already set above
+    }
+
     await user.save();
 
     user.password = undefined;
-    res.status(201).json({
+    res.status(200).json({
         status: "success",
-        data: {
-            user,
-        },
+        data: { user }
     });
 });
 

@@ -32,7 +32,10 @@ export const applyIsArchivedGuard = (req, next) => {
     const VALID_VALUES = ['true', 'false', 'all'];
     const raw = req.query.isArchived;
 
-    if (raw === undefined) return true; // no param — pre-hook handles the default
+    if (raw === undefined) {
+        req.archivedFilter = {};  // pre-hook handles default (active only)
+        return true;
+    }
 
     // Reject objects: ?isArchived[$ne]=true arrives as an object, not a string
     if (typeof raw !== 'string' || !VALID_VALUES.includes(raw)) {
@@ -45,12 +48,20 @@ export const applyIsArchivedGuard = (req, next) => {
     if (!isAdminRole) {
         // Non-admins always see active items — strip the param entirely
         delete req.query.isArchived;
+        req.archivedFilter = {};
     } else if (raw === 'all') {
-        // Replace 'all' with a MongoDB $in expression to bypass the pre-hook
-        req.query.isArchived = { $in: [true, false] };
+        // Delete from query so apiFeatures.filter() doesn't try to JSON-serialize it
+        // Set archivedFilter for controllers to merge into the base query directly
+        delete req.query.isArchived;
+        req.archivedFilter = { isArchived: { $in: [true, false] } };
+    } else if (raw === 'true') {
+        delete req.query.isArchived;
+        req.archivedFilter = { isArchived: true };
+    } else {
+        // 'false' — explicit, same as default
+        delete req.query.isArchived;
+        req.archivedFilter = { isArchived: false };
     }
-    // 'true' or 'false' are passed as-is — apiFeatures.filter() handles them,
-    // and the pre-hook detects that isArchived is defined and skips its default.
 
     return true;
 };

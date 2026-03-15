@@ -25,7 +25,11 @@ class APIFeatures {
      */
     filter() {
         const queryObj = { ...this.queryString };
-        const excludedFields = ['page', 'sort', 'limit', 'fields', 'includeDeleted'];
+        // 'isArchived' is excluded here — it is handled exclusively via
+        // req.archivedFilter set by applyIsArchivedGuard() in controllerUtils.js.
+        // Never let apiFeatures touch it, otherwise Mongoose throws a CastError
+        // when it tries to cast 'true'/'false'/'all' as a Boolean.
+        const excludedFields = ['page', 'sort', 'limit', 'fields', 'includeDeleted', 'isArchived'];
         excludedFields.forEach((el) => delete queryObj[el]);
 
         // [SECURITY] Only convert explicitly allowed comparison operators.

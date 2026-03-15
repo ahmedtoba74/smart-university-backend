@@ -30,7 +30,8 @@ const UPDATE_ALLOWED = ['name', 'description', 'dean_id', 'establishedYear'];
  */
 const enrichWithCounts = async (collegeObj) => {
     const [deptCount, studentCount] = await Promise.all([
-        Department.countDocuments({ college_id: collegeObj._id }),
+        // Explicit isArchived:false — never count archived departments
+        Department.countDocuments({ college_id: collegeObj._id, isArchived: false }),
         User.countDocuments({ college_id: collegeObj._id, role: 'student', active: true })
     ]);
     return { ...collegeObj, deptCount, studentCount };
@@ -54,13 +55,13 @@ export const getAllColleges = catchAsync(async (req, res, next) => {
     const isAdmin = ADMIN_ROLES.includes(req.user.role);
 
     const features = new APIFeatures(
-        College.find().populate('dean_id', 'name email'),
+        College.find(req.archivedFilter).populate('dean_id', 'name email'),
         req.query
     ).filter().sort().limitFields().paginate();
 
     const [colleges, totalResults] = await Promise.all([
         features.query,
-        features.countTotal(College, {})
+        features.countTotal(College, req.archivedFilter)
     ]);
 
     // Role-based projection: non-admins see limited fields
@@ -101,11 +102,8 @@ export const getCollege = catchAsync(async (req, res, next) => {
 
     const isAdmin = ADMIN_ROLES.includes(req.user.role);
 
-    // Build query filter — pre-hook adds isArchived:false unless overridden
-    const filter = { _id: req.params.id };
-    if (req.query.isArchived === 'true' && isAdmin) {
-        filter.isArchived = true;
-    }
+    // Build filter from archivedFilter + id
+    const filter = { _id: req.params.id, ...req.archivedFilter };
 
     const college = await College.findOne(filter).populate('dean_id', 'name email role');
     if (!college) return next(new AppError('College not found.', 404));
@@ -206,7 +204,7 @@ export const archiveCollege = catchAsync(async (req, res, next) => {
 
     // Guard: prevent orphaning active departments
     // Department pre-hook filters to active (isArchived:false) ones automatically
-    const activeDeptCount = await Department.countDocuments({ college_id: req.params.id });
+    const activeDeptCount = await Department.countDocuments({ college_id: req.params.id, isArchived: false });
     if (activeDeptCount > 0) {
         return next(new AppError(
             `Cannot archive this college. It still has ${activeDeptCount} active department(s). Archive all departments first.`,
