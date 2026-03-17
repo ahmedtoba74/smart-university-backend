@@ -29,14 +29,24 @@ class APIFeatures {
         // req.archivedFilter set by applyIsArchivedGuard() in controllerUtils.js.
         // Never let apiFeatures touch it, otherwise Mongoose throws a CastError
         // when it tries to cast 'true'/'false'/'all' as a Boolean.
-        const excludedFields = ['page', 'sort', 'limit', 'fields', 'includeDeleted', 'isArchived'];
+        const excludedFields = [
+            "page",
+            "sort",
+            "limit",
+            "fields",
+            "includeDeleted",
+            "isArchived",
+        ];
         excludedFields.forEach((el) => delete queryObj[el]);
 
         // [SECURITY] Only convert explicitly allowed comparison operators.
         // This prevents ?name[$where]=... or ?name[$expr]=... injection.
         // Any other $ prefixed operator passes as a literal string — Mongoose rejects it.
         let queryStr = JSON.stringify(queryObj);
-        queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
+        queryStr = queryStr.replace(
+            /\b(gte|gt|lte|lt)\b/g,
+            (match) => `$${match}`,
+        );
 
         this._filterObj = JSON.parse(queryStr);
         this.query = this.query.find(this._filterObj);
@@ -50,10 +60,10 @@ class APIFeatures {
      */
     sort() {
         if (this.queryString.sort) {
-            const sortBy = this.queryString.sort.split(',').join(' ');
+            const sortBy = this.queryString.sort.split(",").join(" ");
             this.query = this.query.sort(sortBy);
         } else {
-            this.query = this.query.sort('-createdAt');
+            this.query = this.query.sort("-createdAt");
         }
         return this;
     }
@@ -64,10 +74,10 @@ class APIFeatures {
      */
     limitFields() {
         if (this.queryString.fields) {
-            const fields = this.queryString.fields.split(',').join(' ');
+            const fields = this.queryString.fields.split(",").join(" ");
             this.query = this.query.select(fields);
         } else {
-            this.query = this.query.select('-__v');
+            this.query = this.query.select("-__v");
         }
         return this;
     }
@@ -77,16 +87,16 @@ class APIFeatures {
      * Client usage: ?page=2&limit=10
      */
     paginate() {
-        const page  = Math.max(1, this.queryString.page  * 1 || 1);
+        const page = Math.max(1, this.queryString.page * 1 || 1);
 
         // [SECURITY] Cap limit to MAX_LIMIT — prevents DoS via ?limit=999999
         const MAX_LIMIT = 100;
         const requested = this.queryString.limit * 1 || 25;
         const limit = Math.min(requested, MAX_LIMIT);
 
-        const skip  = (page - 1) * limit;
+        const skip = (page - 1) * limit;
 
-        this.page  = page;
+        this.page = page;
         this.limit = limit;
 
         this.query = this.query.skip(skip).limit(limit);
@@ -107,4 +117,3 @@ class APIFeatures {
 }
 
 export default APIFeatures;
-

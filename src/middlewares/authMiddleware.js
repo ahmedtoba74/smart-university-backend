@@ -1,9 +1,8 @@
-import { promisify } from 'util';
-import jwt from 'jsonwebtoken';
-import User from '../../DB/models/userModel.js';
-import catchAsync from '../utils/catchAsync.js';
-import AppError from '../utils/appError.js';
-
+import { promisify } from "util";
+import jwt from "jsonwebtoken";
+import User from "../../DB/models/userModel.js";
+import catchAsync from "../utils/catchAsync.js";
+import AppError from "../utils/appError.js";
 
 // ==============================
 // 1. Authentication Middleware
@@ -21,16 +20,19 @@ export const protect = catchAsync(async (req, res, next) => {
 
     if (
         req.headers.authorization &&
-        req.headers.authorization.startsWith('Bearer')
+        req.headers.authorization.startsWith("Bearer")
     ) {
-        token = req.headers.authorization.split(' ')[1];
+        token = req.headers.authorization.split(" ")[1];
     } else if (req.cookies && req.cookies.jwt) {
         token = req.cookies.jwt;
     }
 
     if (!token) {
         return next(
-            new AppError('You are not logged in! Please log in to get access.', 401)
+            new AppError(
+                "You are not logged in! Please log in to get access.",
+                401,
+            ),
         );
     }
 
@@ -39,16 +41,25 @@ export const protect = catchAsync(async (req, res, next) => {
     const currentUser = await User.findById(decoded.id);
     if (!currentUser) {
         return next(
-            new AppError('The user belonging to this token no longer exists.', 401)
+            new AppError(
+                "The user belonging to this token no longer exists.",
+                401,
+            ),
         );
     }
 
     // Single-session guard: a newer login invalidates all older tokens
     if (currentUser.lastLoginAt) {
-        const lastLoginTimestamp = parseInt(currentUser.lastLoginAt.getTime() / 1000, 10);
+        const lastLoginTimestamp = parseInt(
+            currentUser.lastLoginAt.getTime() / 1000,
+            10,
+        );
         if (lastLoginTimestamp > decoded.iat) {
             return next(
-                new AppError('User recently logged in from another device. Please log in again.', 401)
+                new AppError(
+                    "User recently logged in from another device. Please log in again.",
+                    401,
+                ),
             );
         }
     }
@@ -57,25 +68,30 @@ export const protect = catchAsync(async (req, res, next) => {
     if (currentUser.changedPasswordAfter(decoded.iat)) {
         return next(
             new AppError(
-                'User recently changed password! Please log in again.',
+                "User recently changed password! Please log in again.",
                 401,
             ),
         );
     }
 
-    // Temporary password guard: admin-generated passwords must be changed immediately.
-    // Only the updatePassword and resetPassword routes are allowed through.
-    if (currentUser.requiresPasswordChange) {
-        const isPasswordRoute =
-            req.path.includes('/updatePassword') ||
-            req.path.includes('/resetPassword');
-
-        if (!isPasswordRoute) {
+    /**
+     * Invalidation Timestamp Guard (Phase 2):
+     * Immediately terminates sessions blocked via admin or self-update.
+     * Compares the JWT's issued-at time (iat) against `tokensInvalidatedAt`.
+     * Using `<=` (not `<`) ensures cryptographic safety and naturally handles clock drift.
+     */
+    if (currentUser.tokensInvalidatedAt) {
+        const invalidationTimestamp = parseInt(
+            currentUser.tokensInvalidatedAt.getTime() / 1000,
+            10,
+        );
+        // Using <= (not <) — cryptographically safe, handles clock drift natively
+        if (decoded.iat <= invalidationTimestamp) {
             return next(
                 new AppError(
-                    'You must change your temporary password before continuing. Please use PATCH /api/v1/auth/updatePassword.',
-                    403
-                )
+                    "Your session was terminated. Please log in again.",
+                    401,
+                ),
             );
         }
     }
@@ -84,7 +100,6 @@ export const protect = catchAsync(async (req, res, next) => {
     res.locals.user = currentUser;
     next();
 });
-
 
 // ==============================
 // 2. Authorization Middleware
@@ -99,13 +114,15 @@ export const restrictTo = (...roles) => {
     return (req, res, next) => {
         if (!roles.includes(req.user.role)) {
             return next(
-                new AppError('You do not have permission to perform this action', 403)
+                new AppError(
+                    "You do not have permission to perform this action",
+                    403,
+                ),
             );
         }
         next();
     };
 };
-
 
 // ==============================
 // 3. College Scope Middleware
@@ -123,18 +140,18 @@ export const restrictTo = (...roles) => {
  * WRITE operations must additionally perform an ownership check.
  */
 export const attachCollegeScope = (req, res, next) => {
-    if (req.user.role === 'universityAdmin') {
+    if (req.user.role === "universityAdmin") {
         req.scopeFilter = {};
         return next();
     }
 
-    if (req.user.role === 'collegeAdmin') {
+    if (req.user.role === "collegeAdmin") {
         if (!req.user.college_id) {
             return next(
                 new AppError(
-                    'Your account is not linked to any college. Please contact the system administrator.',
-                    403
-                )
+                    "Your account is not linked to any college. Please contact the system administrator.",
+                    403,
+                ),
             );
         }
         req.scopeFilter = { college_id: req.user.college_id };

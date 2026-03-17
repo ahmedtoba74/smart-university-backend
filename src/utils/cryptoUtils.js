@@ -75,3 +75,83 @@ export const hashForSearch = (text) => {
         .update(text + HASH_SECRET)
         .digest('hex');
 };
+
+/**
+ * Encrypt plaintext for temporary passwords in BulkImportLog using AES-256-GCM.
+ * GCM provides both confidentiality and authentication (AEAD).
+ * @function encryptBulkPassword
+ * @param {string} plaintext - The plaintext password to encrypt
+ * @param {string} secret - Encryption secret (should be 32 bytes hex or derived from env)
+ * @returns {string|null} Ciphertext in format "iv:authTag:encryptedData" (all hex encoded) or null if encryption fails
+ */
+export const encryptBulkPassword = (plaintext, secret) => {
+    if (!plaintext || !secret) return null;
+
+    try {
+        const algorithm = 'aes-256-gcm';
+        const iv = crypto.randomBytes(16);
+        
+        // Derive a proper 32-byte key from secret if needed
+        let key;
+        if (Buffer.byteLength(secret) === 32) {
+            key = Buffer.from(secret);
+        } else {
+            key = crypto.createHash('sha256').update(secret).digest();
+        }
+
+        const cipher = crypto.createCipheriv(algorithm, key, iv);
+        let encrypted = cipher.update(plaintext, 'utf8', 'hex');
+        encrypted += cipher.final('hex');
+        
+        const authTag = cipher.getAuthTag();
+
+        return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
+    } catch (error) {
+        console.error('Encryption error:', error.message);
+        return null;
+    }
+};
+
+/**
+ * Decrypt ciphertext from BulkImportLog using AES-256-GCM.
+ * @function decryptBulkPassword
+ * @param {string} ciphertext - Ciphertext in format "iv:authTag:encryptedData"
+ * @param {string} secret - Decryption secret (must match encryption secret)
+ * @returns {string|null} Plaintext password or null if decryption fails
+ */
+export const decryptBulkPassword = (ciphertext, secret) => {
+    if (!ciphertext || !secret) return null;
+
+    try {
+        const algorithm = 'aes-256-gcm';
+        const parts = ciphertext.split(':');
+        
+        if (parts.length !== 3) {
+            console.error('Invalid ciphertext format');
+            return null;
+        }
+
+        const iv = Buffer.from(parts[0], 'hex');
+        const authTag = Buffer.from(parts[1], 'hex');
+        const encrypted = parts[2];
+
+        // Derive key same way as encrypt
+        let key;
+        if (Buffer.byteLength(secret) === 32) {
+            key = Buffer.from(secret);
+        } else {
+            key = crypto.createHash('sha256').update(secret).digest();
+        }
+
+        const decipher = crypto.createDecipheriv(algorithm, key, iv);
+        decipher.setAuthTag(authTag);
+        
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+
+        return decrypted;
+    } catch (error) {
+        console.error('Decryption error:', error.message);
+        return null;
+    }
+};

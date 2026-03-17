@@ -1,23 +1,24 @@
-import Department from '../../../DB/models/departmentModel.js';
-import College from '../../../DB/models/collegeModel.js';
-import User from '../../../DB/models/userModel.js';
-import APIFeatures from '../../utils/apiFeatures.js';
-import catchAsync from '../../utils/catchAsync.js';
-import AppError from '../../utils/appError.js';
+import Department from "../../../DB/models/departmentModel.js";
+import College from "../../../DB/models/collegeModel.js";
+import User from "../../../DB/models/userModel.js";
+import APIFeatures from "../../utils/apiFeatures.js";
+import catchAsync from "../../utils/catchAsync.js";
+import AppError from "../../utils/appError.js";
 import {
     applyIsArchivedGuard,
     applyFieldsGuard,
     filterReqBody,
-    buildOwnershipFilter
-} from '../../utils/controllerUtils.js';
+    buildOwnershipFilter,
+    buildIdOrSlugFilter,
+} from "../../utils/controllerUtils.js";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 /** Fields allowed when creating a department */
-const CREATE_ALLOWED = ['name', 'code', 'description', 'college_id', 'head_id'];
+const CREATE_ALLOWED = ["name", "code", "description", "college_id", "head_id"];
 
 /** Fields allowed when updating a department (whitelist — never blacklist) */
-const UPDATE_ALLOWED = ['name', 'code', 'description', 'head_id'];
+const UPDATE_ALLOWED = ["name", "code", "description", "head_id"];
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
 
@@ -35,22 +36,28 @@ export const getAllDepartments = catchAsync(async (req, res, next) => {
     const baseFilter = { ...req.scopeFilter, ...req.archivedFilter };
 
     const features = new APIFeatures(
-        Department.find(baseFilter).populate('head_id', 'name email').populate('college_id', 'name code'),
-        req.query
-    ).filter().sort().limitFields().paginate();
+        Department.find(baseFilter)
+            .populate("head_id", "name email")
+            .populate("college_id", "name code"),
+        req.query,
+    )
+        .filter()
+        .sort()
+        .limitFields()
+        .paginate();
 
     const [departments, totalResults] = await Promise.all([
         features.query,
-        features.countTotal(Department, baseFilter)
+        features.countTotal(Department, baseFilter),
     ]);
 
     res.status(200).json({
-        status: 'success',
+        status: "success",
         results: departments.length,
         currentPage: features.page,
         totalPages: Math.ceil(totalResults / features.limit),
         totalResults,
-        data: { departments }
+        data: { departments },
     });
 });
 
@@ -63,17 +70,18 @@ export const getDepartment = catchAsync(async (req, res, next) => {
     if (!applyIsArchivedGuard(req, next)) return;
     if (!applyFieldsGuard(req, next)) return;
 
-    // Merge _id + scopeFilter + archivedFilter
-    const filter = { _id: req.params.id, ...req.scopeFilter, ...req.archivedFilter };
+    // Supports both ObjectId and code: /departments/64f... OR /departments/cs
+    const idFilter = buildIdOrSlugFilter(req.params.id, "code");
+    const filter = { ...idFilter, ...req.scopeFilter, ...req.archivedFilter };
 
     const department = await Department.findOne(filter)
-        .populate('head_id', 'name email role')
-        .populate('college_id', 'name code');
+        .populate("head_id", "name email role")
+        .populate("college_id", "name code");
 
     // 404 covers both "not found" AND "belongs to another college" — no info leakage
-    if (!department) return next(new AppError('Department not found.', 404));
+    if (!department) return next(new AppError("Department not found.", 404));
 
-    res.status(200).json({ status: 'success', data: { department } });
+    res.status(200).json({ status: "success", data: { department } });
 });
 
 /**
@@ -87,22 +95,24 @@ export const createDepartment = catchAsync(async (req, res, next) => {
     const body = filterReqBody(req.body, CREATE_ALLOWED);
 
     if (!body.name || !body.code) {
-        return next(new AppError('Department name and code are required.', 400));
+        return next(
+            new AppError("Department name and code are required.", 400),
+        );
     }
 
     // [SECURITY] Force college_id for collegeAdmin — never trust client value
-    if (req.user.role === 'collegeAdmin') {
+    if (req.user.role === "collegeAdmin") {
         body.college_id = req.user.college_id;
     } else {
         // universityAdmin must supply college_id
         if (!body.college_id) {
-            return next(new AppError('college_id is required.', 400));
+            return next(new AppError("college_id is required.", 400));
         }
         // Verify the target college exists and is not archived
         // College pre-hook returns null for archived; no custom filter needed
-        const college = await College.findById(body.college_id).select('_id');
+        const college = await College.findById(body.college_id).select("_id");
         if (!college) {
-            return next(new AppError('College not found or is archived.', 404));
+            return next(new AppError("College not found or is archived.", 404));
         }
     }
 
@@ -111,19 +121,21 @@ export const createDepartment = catchAsync(async (req, res, next) => {
         const head = await User.findOne({
             _id: body.head_id,
             college_id: body.college_id,
-            active: true
-        }).select('_id');
+            active: true,
+        }).select("_id");
         if (!head) {
-            return next(new AppError(
-                'The specified department head does not exist, is inactive, or does not belong to this college.',
-                404
-            ));
+            return next(
+                new AppError(
+                    "The specified department head does not exist, is inactive, or does not belong to this college.",
+                    404,
+                ),
+            );
         }
     }
 
     const department = await Department.create(body);
 
-    res.status(201).json({ status: 'success', data: { department } });
+    res.status(201).json({ status: "success", data: { department } });
 });
 
 /**
@@ -137,41 +149,51 @@ export const updateDepartment = catchAsync(async (req, res, next) => {
     const filteredBody = filterReqBody(req.body, UPDATE_ALLOWED);
 
     if (Object.keys(filteredBody).length === 0) {
-        return next(new AppError('No valid fields to update.', 400));
+        return next(new AppError("No valid fields to update.", 400));
     }
 
     // Validate new head_id if being updated
     if (filteredBody.head_id) {
         // We need the department's college first — use ownership filter to fetch
-        const existing = await Department.findOne(buildOwnershipFilter(req.params.id, req.user));
-        if (!existing) return next(new AppError('Department not found.', 404));
+        const existing = await Department.findOne(
+            buildOwnershipFilter(req.params.id, req.user, "college_id", "code"),
+        );
+        if (!existing) return next(new AppError("Department not found.", 404));
 
         const head = await User.findOne({
             _id: filteredBody.head_id,
             college_id: existing.college_id,
-            active: true
-        }).select('_id');
+            active: true,
+        }).select("_id");
 
         if (!head) {
-            return next(new AppError(
-                'The specified department head does not exist, is inactive, or does not belong to this college.',
-                404
-            ));
+            return next(
+                new AppError(
+                    "The specified department head does not exist, is inactive, or does not belong to this college.",
+                    404,
+                ),
+            );
         }
     }
 
     // [SECURITY] Atomic ownership check: collegeAdmin's college_id in the filter
-    const filter = buildOwnershipFilter(req.params.id, req.user);
+    const filter = buildOwnershipFilter(
+        req.params.id,
+        req.user,
+        "college_id",
+        "code",
+    );
 
-    const department = await Department.findOneAndUpdate(
-        filter,
-        filteredBody,
-        { new: true, runValidators: true }
-    ).populate('head_id', 'name email').populate('college_id', 'name code');
+    const department = await Department.findOneAndUpdate(filter, filteredBody, {
+        new: true,
+        runValidators: true,
+    })
+        .populate("head_id", "name email")
+        .populate("college_id", "name code");
 
-    if (!department) return next(new AppError('Department not found.', 404));
+    if (!department) return next(new AppError("Department not found.", 404));
 
-    res.status(200).json({ status: 'success', data: { department } });
+    res.status(200).json({ status: "success", data: { department } });
 });
 
 /**
@@ -181,28 +203,36 @@ export const updateDepartment = catchAsync(async (req, res, next) => {
  */
 export const archiveDepartment = catchAsync(async (req, res, next) => {
     // Atomic ownership check — 404 for both not-found and wrong college
-    const filter = buildOwnershipFilter(req.params.id, req.user);
+    const filter = buildOwnershipFilter(
+        req.params.id,
+        req.user,
+        "college_id",
+        "code",
+    );
     const department = await Department.findOne(filter);
-    if (!department) return next(new AppError('Department not found.', 404));
+    if (!department) return next(new AppError("Department not found.", 404));
 
     // Guard: prevent orphaning active users
     // Users use `active` field — not isArchived
     const activeUserCount = await User.countDocuments({
         department_id: req.params.id,
-        active: true
+        active: true,
     });
 
     if (activeUserCount > 0) {
-        return next(new AppError(
-            `Cannot archive this department. It still has ${activeUserCount} active user(s). Reassign or deactivate them first.`,
-            400
-        ));
+        return next(
+            new AppError(
+                `Cannot archive this department. It still has ${activeUserCount} active user(s). Reassign or deactivate them first.`,
+                400,
+            ),
+        );
     }
 
     department.isArchived = true;
+    department.archivedAt = new Date();
     await department.save({ validateBeforeSave: false });
 
-    res.status(204).json({ status: 'success', data: null });
+    res.status(204).json({ status: "success", data: null });
 });
 
 /**
@@ -215,24 +245,31 @@ export const restoreDepartment = catchAsync(async (req, res, next) => {
     // Find the archived department first (no ownership override — universityAdmin only)
     const department = await Department.findOne({
         _id: req.params.id,
-        isArchived: true
+        isArchived: true,
     });
     if (!department) {
-        return next(new AppError('Department not found or is already active.', 404));
+        return next(
+            new AppError("Department not found or is already active.", 404),
+        );
     }
 
     // Verify the parent college is NOT archived before restoring
     // College pre-hook: College.findById returns null if college is archived
-    const parentCollege = await College.findById(department.college_id).select('_id');
+    const parentCollege = await College.findById(department.college_id).select(
+        "_id",
+    );
     if (!parentCollege) {
-        return next(new AppError(
-            'Cannot restore this department. Its parent college is archived. Restore the college first.',
-            400
-        ));
+        return next(
+            new AppError(
+                "Cannot restore this department. Its parent college is archived. Restore the college first.",
+                400,
+            ),
+        );
     }
 
     department.isArchived = false;
+    department.archivedAt = null;
     await department.save({ validateBeforeSave: false });
 
-    res.status(200).json({ status: 'success', data: { department } });
+    res.status(200).json({ status: "success", data: { department } });
 });

@@ -1,25 +1,206 @@
 import express from "express";
 import * as userController from "./userController.js";
-import { protect, restrictTo } from "../../middlewares/authMiddleware.js";
+import {
+    protect,
+    restrictTo,
+    attachCollegeScope,
+} from "../../middlewares/authMiddleware.js";
+import { enforcePasswordChange } from "../../middlewares/enforcePasswordChange.js";
 import { uploadMix } from "../../middlewares/uploadMiddleware.js";
 import { fileValidation } from "../../utils/fileExtensions.js";
-const router = express.Router();
 
-router.use(protect);
+const router = express.Router({ mergeParams: true });
 
-// 'student', 'ta', 'doctor', 'collegeAdmin', 'universityAdmin'
+// ── Interceptor ───────────────────────────────────────────────────────
+export const setNestedUserFilters = (req, res, next) => {
+    if (req.params.collegeId)    req.query.college_id    = req.params.collegeId;
+    if (req.params.departmentId) req.query.department_id = req.params.departmentId;
+    next();
+};
+router.use(setNestedUserFilters);
 
-router.route("/me").get(userController.getMe, userController.getUser);
-router.patch("/restoreByNationalID", restrictTo("universityAdmin", "collegeAdmin"), userController.restoreUserByNationalID);
+// ── STATIC ROUTES ─────────────────────────────────────────────────────
 
-router.route("/")
-    .post(restrictTo("universityAdmin", "collegeAdmin"), uploadMix([{ name: 'photo', maxCount: 1 }], fileValidation.image), userController.createUser)
-    .get(restrictTo("universityAdmin", "collegeAdmin", "ta", "doctor"), userController.getAllUsers);
+// GET /me
+router.get(
+    "/me",
+    protect,
+    enforcePasswordChange,
+    userController.getMe,
+    userController.getUser   // ← getMe sets req.params.id then calls next()
+);
 
-router.route("/:id")
-    .get(restrictTo("universityAdmin", "collegeAdmin", "ta", "doctor"), userController.getUser)
-    .patch(restrictTo("universityAdmin", "collegeAdmin"), uploadMix([{ name: 'photo', maxCount: 1 }], fileValidation.image), userController.updateUser)
-    .delete(restrictTo("universityAdmin", "collegeAdmin"), userController.deleteUser);
+// POST /lookup
+router.post(
+    "/lookup",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin", "collegeAdmin"),
+    attachCollegeScope,
+    userController.lookupUserByNationalID
+);
 
+// POST /bulk-import
+router.post(
+    "/bulk-import",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin", "collegeAdmin"),
+    attachCollegeScope,
+    uploadMix([{ name: "file", maxCount: 1 }], fileValidation.file),
+    userController.bulkImportUsers
+);
+
+// PATCH /bulk-actions
+router.patch(
+    "/bulk-actions",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin", "collegeAdmin"),
+    attachCollegeScope,
+    userController.bulkActions
+);
+
+// PATCH /allocate
+router.patch(
+    "/allocate",
+    protect,
+    enforcePasswordChange,
+    restrictTo("collegeAdmin"),
+    attachCollegeScope,
+    userController.allocateUsers
+);
+
+// PATCH /resend-credentials
+router.patch(
+    "/resend-credentials",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin", "collegeAdmin"),
+    userController.resendCredentials
+    // No attachCollegeScope — scope check is done manually inside controller via log.college_id
+);
+
+// ── COLLECTION ROUTES ─────────────────────────────────────────────────
+
+// GET / — list users
+router.get(
+    "/",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin", "collegeAdmin", "ta", "doctor"),
+    attachCollegeScope,
+    userController.getAllUsers
+);
+
+// POST / — create user
+router.post(
+    "/",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin", "collegeAdmin"),
+    attachCollegeScope,
+    uploadMix([{ name: "photo", maxCount: 1 }], fileValidation.image),
+    userController.createUser
+);
+
+// ── DYNAMIC ROUTES ────────────────────────────────────────────────────
+
+// GET /:id
+router.get(
+    "/:id",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin", "collegeAdmin", "ta", "doctor"),
+    attachCollegeScope,
+    userController.getUser
+);
+
+// PATCH /:id — general update
+router.patch(
+    "/:id",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin", "collegeAdmin"),
+    attachCollegeScope,
+    uploadMix([{ name: "photo", maxCount: 1 }], fileValidation.image),
+    userController.updateUser
+);
+
+// PATCH /:id/deactivate
+router.patch(
+    "/:id/deactivate",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin", "collegeAdmin"),
+    attachCollegeScope,
+    userController.deactivateUser
+);
+
+// PATCH /:id/restore
+router.patch(
+    "/:id/restore",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin"),
+    userController.restoreUser
+);
+
+// PATCH /:id/unlock
+router.patch(
+    "/:id/unlock",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin"),
+    userController.unlockUser
+);
+
+// PATCH /:id/force-logout
+router.patch(
+    "/:id/force-logout",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin"),
+    userController.forceLogoutUser
+);
+
+// PATCH /:id/reset-password
+router.patch(
+    "/:id/reset-password",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin", "collegeAdmin"),
+    attachCollegeScope,
+    userController.resetUserPassword
+);
+
+// PATCH /:id/role
+router.patch(
+    "/:id/role",
+    protect,
+    enforcePasswordChange,
+    restrictTo("universityAdmin"),
+    userController.changeUserRole
+);
+
+// PATCH /:id/assign-rfid
+router.patch(
+    "/:id/assign-rfid",
+    protect,
+    enforcePasswordChange,
+    restrictTo("collegeAdmin"),
+    attachCollegeScope,
+    userController.assignRfid
+);
+
+// PATCH /:id/graduate
+router.patch(
+    "/:id/graduate",
+    protect,
+    enforcePasswordChange,
+    restrictTo("collegeAdmin"),
+    attachCollegeScope,
+    userController.graduateUser
+);
 
 export default router;

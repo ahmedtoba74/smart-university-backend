@@ -1,4 +1,5 @@
 import User from "../../../DB/models/userModel.js";
+import BulkImportLog from '../../../DB/models/bulkImportLogModel.js';
 import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
 import jwt from "jsonwebtoken";
@@ -138,7 +139,8 @@ export const loginStepOne = catchAsync(async (req, res, next) => {
     // This prevents attackers from resetting their failed attempts by re-authenticating Step 1.
 
     // 2. Generate OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Use crypto.randomInt instead of Math.random — cryptographically secure
+    const otp = crypto.randomInt(100000, 999999).toString();
 
     // 3. Hash OTP & Save
     user.saveTwoFactorCode(otp);
@@ -255,7 +257,8 @@ export const initiateUpdatePassword = catchAsync(async (req, res, next) => {
 
     user.tempPassword = encrypt(password);
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Use crypto.randomInt instead of Math.random — cryptographically secure
+    const otp = crypto.randomInt(100000, 999999).toString();
     user.saveTwoFactorCode(otp);
 
     await user.save({ validateBeforeSave: false });
@@ -317,7 +320,31 @@ export const confirmUpdatePassword = catchAsync(async (req, res, next) => {
     user.twoFactorSecret = undefined;
     user.twoFactorExpires = undefined;
 
+    // Invalidate all existing sessions immediately after password change
+    user.tokensInvalidatedAt = new Date();
+
+    // Flip requiresPasswordChange in case this flow was triggered by a temp password
+    user.requiresPasswordChange = false;
+
     await user.save();
+
+    // Null out tempPassword in BulkImportLog for this user
+    // (TTL alone is not sufficient — temp passwords must be cleared immediately on change)
+    await BulkImportLog.updateMany(
+        {
+            'records.userId': user._id,
+            'records.tempPassword': { $ne: null }
+        },
+        {
+            $set: { 'records.$[elem].tempPassword': null }
+        },
+        {
+            arrayFilters: [
+                { 'elem.userId': user._id, 'elem.tempPassword': { $ne: null } }
+            ]
+        }
+    );
+
     createSendToken(user, 200, res, 'Password updated successfully');
 });
 
@@ -409,6 +436,10 @@ export const resetPassword = catchAsync(async (req, res, next) => {
     user.password = password;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
+
+    // Invalidate all existing sessions after successful password reset
+    user.tokensInvalidatedAt = new Date();
+
     await user.save();
 
     createSendToken(user, 200, res, 'Password reset successfully');

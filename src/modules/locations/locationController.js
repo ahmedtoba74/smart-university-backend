@@ -1,21 +1,39 @@
-import Location from '../../../DB/models/locationModel.js';
-import College from '../../../DB/models/collegeModel.js';
-import APIFeatures from '../../utils/apiFeatures.js';
-import catchAsync from '../../utils/catchAsync.js';
-import AppError from '../../utils/appError.js';
+import Location from "../../../DB/models/locationModel.js";
+import College from "../../../DB/models/collegeModel.js";
+import APIFeatures from "../../utils/apiFeatures.js";
+import catchAsync from "../../utils/catchAsync.js";
+import AppError from "../../utils/appError.js";
 import {
     applyIsArchivedGuard,
     applyFieldsGuard,
     filterReqBody,
-    buildOwnershipFilter
-} from '../../utils/controllerUtils.js';
+    buildOwnershipFilter,
+    buildIdOrSlugFilter,
+} from "../../utils/controllerUtils.js";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const CREATE_ALLOWED = ['name', 'college_id', 'building', 'floor', 'roomNumber', 'capacity', 'type', 'readerId'];
-const UPDATE_ALLOWED = ['name', 'building', 'floor', 'roomNumber', 'capacity', 'type', 'readerId'];
+const CREATE_ALLOWED = [
+    "name",
+    "college_id",
+    "building",
+    "floor",
+    "roomNumber",
+    "capacity",
+    "type",
+    "readerId",
+];
+const UPDATE_ALLOWED = [
+    "name",
+    "building",
+    "floor",
+    "roomNumber",
+    "capacity",
+    "type",
+    "readerId",
+];
 
-const VALID_STATUS = ['active', 'maintenance'];
+const VALID_STATUS = ["active", "maintenance"];
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
 
@@ -30,22 +48,26 @@ export const getAllLocations = catchAsync(async (req, res, next) => {
     const baseFilter = { ...req.scopeFilter, ...req.archivedFilter };
 
     const features = new APIFeatures(
-        Location.find(baseFilter).populate('college_id', 'name'),
-        req.query
-    ).filter().sort().limitFields().paginate();
+        Location.find(baseFilter).populate("college_id", "name"),
+        req.query,
+    )
+        .filter()
+        .sort()
+        .limitFields()
+        .paginate();
 
     const [locations, totalResults] = await Promise.all([
         features.query,
-        features.countTotal(Location, baseFilter)
+        features.countTotal(Location, baseFilter),
     ]);
 
     res.status(200).json({
-        status: 'success',
+        status: "success",
         results: locations.length,
         currentPage: features.page,
         totalPages: Math.ceil(totalResults / features.limit),
         totalResults,
-        data: { locations }
+        data: { locations },
     });
 });
 
@@ -58,13 +80,18 @@ export const getLocation = catchAsync(async (req, res, next) => {
     if (!applyIsArchivedGuard(req, next)) return;
     if (!applyFieldsGuard(req, next)) return;
 
-    const filter = { _id: req.params.id, ...req.scopeFilter, ...req.archivedFilter };
+    // Supports both ObjectId and slug: /locations/64f... OR /locations/hall-a
+    const idFilter = buildIdOrSlugFilter(req.params.id);
+    const filter = { ...idFilter, ...req.scopeFilter, ...req.archivedFilter };
 
-    const location = await Location.findOne(filter).populate('college_id', 'name code');
+    const location = await Location.findOne(filter).populate(
+        "college_id",
+        "name code",
+    );
 
-    if (!location) return next(new AppError('Location not found.', 404));
+    if (!location) return next(new AppError("Location not found.", 404));
 
-    res.status(200).json({ status: 'success', data: { location } });
+    res.status(200).json({ status: "success", data: { location } });
 });
 
 /**
@@ -76,31 +103,48 @@ export const createLocation = catchAsync(async (req, res, next) => {
     const body = filterReqBody(req.body, CREATE_ALLOWED);
 
     if (!body.name || !body.capacity || !body.type) {
-        return next(new AppError('Location name, capacity, and type are required.', 400));
+        return next(
+            new AppError(
+                "Location name, capacity, and type are required.",
+                400,
+            ),
+        );
     }
 
     // [SECURITY] Force college_id for collegeAdmin
-    if (req.user.role === 'collegeAdmin') {
+    if (req.user.role === "collegeAdmin") {
         body.college_id = req.user.college_id;
     } else {
-        if (!body.college_id) return next(new AppError('college_id is required.', 400));
-        const college = await College.findById(body.college_id).select('_id');
-        if (!college) return next(new AppError('College not found or is archived.', 404));
+        if (!body.college_id)
+            return next(new AppError("college_id is required.", 400));
+        const college = await College.findById(body.college_id).select("_id");
+        if (!college)
+            return next(new AppError("College not found or is archived.", 404));
     }
 
     // Validate type against schema enum before hitting DB
-    const VALID_TYPES = ['lecture_hall', 'lab', 'section_room', 'auditorium'];
+    const VALID_TYPES = ["lecture_hall", "lab", "section_room", "auditorium"];
     if (!VALID_TYPES.includes(body.type)) {
-        return next(new AppError(`type must be one of: ${VALID_TYPES.join(', ')}.`, 400));
+        return next(
+            new AppError(
+                `type must be one of: ${VALID_TYPES.join(", ")}.`,
+                400,
+            ),
+        );
     }
 
     // readerId uniqueness: catch 11000 and return a clear message
     try {
         const location = await Location.create(body);
-        res.status(201).json({ status: 'success', data: { location } });
+        res.status(201).json({ status: "success", data: { location } });
     } catch (err) {
         if (err.code === 11000 && err.keyPattern?.readerId) {
-            return next(new AppError('Reader ID is already registered to another location.', 400));
+            return next(
+                new AppError(
+                    "Reader ID is already registered to another location.",
+                    400,
+                ),
+            );
         }
         throw err;
     }
@@ -116,35 +160,54 @@ export const updateLocation = catchAsync(async (req, res, next) => {
     const filteredBody = filterReqBody(req.body, UPDATE_ALLOWED);
 
     if (Object.keys(filteredBody).length === 0) {
-        return next(new AppError('No valid fields to update.', 400));
+        return next(new AppError("No valid fields to update.", 400));
     }
 
-    // [SECURITY] readerId uniqueness check — use !== undefined so empty string is caught too
+    // 1. Fetch location first (with ownership filter) to get its real _id and prevent TOCTOU
+    const filter = buildOwnershipFilter(
+        req.params.id,
+        req.user,
+        "college_id",
+        "slug",
+    );
+    let location = await Location.findOne(filter);
+
+    if (!location) return next(new AppError("Location not found.", 404));
+
+    // 2. readerId uniqueness check
     if (filteredBody.readerId !== undefined) {
-        if (filteredBody.readerId === '') {
-            return next(new AppError('readerId cannot be an empty string.', 400));
+        if (filteredBody.readerId === "") {
+            return next(
+                new AppError("readerId cannot be an empty string.", 400),
+            );
         }
         const conflict = await Location.findOne({
             readerId: filteredBody.readerId,
-            _id: { $ne: req.params.id }   // exclude the current location itself
+            _id: { $ne: location._id }, // exclude the current location using real _id!
         });
         if (conflict) {
-            return next(new AppError('Reader ID is already assigned to another location.', 400));
+            return next(
+                new AppError(
+                    "Reader ID is already assigned to another location.",
+                    400,
+                ),
+            );
         }
     }
 
-    // [SECURITY] TOCTOU: ownership baked into the atomic query
-    const filter = buildOwnershipFilter(req.params.id, req.user);
-
-    const location = await Location.findOneAndUpdate(
-        filter,
+    // 3. Update using findOneAndUpdate to hit all query hooks
+    location = await Location.findOneAndUpdate(
+        { _id: location._id },
         filteredBody,
-        { new: true, runValidators: true }
+        {
+            new: true,
+            runValidators: true,
+        },
     );
 
-    if (!location) return next(new AppError('Location not found.', 404));
+    if (!location) return next(new AppError("Location not found.", 404));
 
-    res.status(200).json({ status: 'success', data: { location } });
+    res.status(200).json({ status: "success", data: { location } });
 });
 
 /**
@@ -161,32 +224,47 @@ export const updateLocationStatus = catchAsync(async (req, res, next) => {
 
     // Validate status value strictly
     if (!status || !VALID_STATUS.includes(status)) {
-        return next(new AppError(`status must be one of: ${VALID_STATUS.join(', ')}.`, 400));
+        return next(
+            new AppError(
+                `status must be one of: ${VALID_STATUS.join(", ")}.`,
+                400,
+            ),
+        );
     }
 
     // [SECURITY] TOCTOU: ownership in fetch filter
-    const filter = buildOwnershipFilter(req.params.id, req.user);
+    const filter = buildOwnershipFilter(
+        req.params.id,
+        req.user,
+        "college_id",
+        "slug",
+    );
     const location = await Location.findOne(filter);
-    if (!location) return next(new AppError('Location not found.', 404));
+    if (!location) return next(new AppError("Location not found.", 404));
 
     if (location.status === status) {
-        return next(new AppError(`Location is already set to '${status}'.`, 400));
+        return next(
+            new AppError(`Location is already set to '${status}'.`, 400),
+        );
     }
 
     // Guard: block maintenance if an active attendance session is running
     // AttendanceSession is a Phase 5 model — safe dynamic import to avoid startup errors
-    if (status === 'maintenance') {
+    if (status === "maintenance") {
         try {
-            const { default: AttendanceSession } = await import('../../../DB/models/attendanceSessionModel.js');
+            const { default: AttendanceSession } =
+                await import("../../../DB/models/attendanceSessionModel.js");
             const activeSession = await AttendanceSession.findOne({
                 location_id: req.params.id,
-                expiresAt: { $gt: new Date() }
+                expiresAt: { $gt: new Date() },
             });
             if (activeSession) {
-                return next(new AppError(
-                    'Cannot set location to maintenance while an active attendance session is running.',
-                    400
-                ));
+                return next(
+                    new AppError(
+                        "Cannot set location to maintenance while an active attendance session is running.",
+                        400,
+                    ),
+                );
             }
         } catch {
             // AttendanceSession model not yet created (Phase 5) — skip the guard
@@ -196,7 +274,7 @@ export const updateLocationStatus = catchAsync(async (req, res, next) => {
     location.status = status;
     await location.save({ validateBeforeSave: false });
 
-    res.status(200).json({ status: 'success', data: { location } });
+    res.status(200).json({ status: "success", data: { location } });
 });
 
 /**
@@ -209,29 +287,33 @@ export const updateLocationStatus = catchAsync(async (req, res, next) => {
 export const archiveLocation = catchAsync(async (req, res, next) => {
     // universityAdmin only (enforced in router) — no ownership filter needed
     const location = await Location.findById(req.params.id);
-    if (!location) return next(new AppError('Location not found.', 404));
+    if (!location) return next(new AppError("Location not found.", 404));
 
     // Guard: block if location is in use in any active course offering
     // CourseOffering pre-hook already filters out archived offerings
     try {
-        const { default: CourseOffering } = await import('../../../DB/models/courseOfferingModel.js');
+        const { default: CourseOffering } =
+            await import("../../../DB/models/courseOfferingModel.js");
         const activeOffering = await CourseOffering.findOne({
-            'schedule.location': req.params.id
+            "schedule.location": req.params.id,
         });
         if (activeOffering) {
-            return next(new AppError(
-                'Cannot archive this location. It is scheduled in an active course offering.',
-                400
-            ));
+            return next(
+                new AppError(
+                    "Cannot archive this location. It is scheduled in an active course offering.",
+                    400,
+                ),
+            );
         }
     } catch {
         // CourseOffering model issue — proceed with archive (fail open for admin ops)
     }
 
     location.isArchived = true;
+    location.archivedAt = new Date();
     await location.save({ validateBeforeSave: false });
 
-    res.status(204).json({ status: 'success', data: null });
+    res.status(204).json({ status: "success", data: null });
 });
 
 /**
@@ -244,22 +326,29 @@ export const restoreLocation = catchAsync(async (req, res, next) => {
     const filter = buildOwnershipFilter(req.params.id, req.user);
     const location = await Location.findOne({ ...filter, isArchived: true });
     if (!location) {
-        return next(new AppError('Location not found or is already active.', 404));
+        return next(
+            new AppError("Location not found or is already active.", 404),
+        );
     }
 
     // Step 2: Verify parent college is NOT archived before restoring
     // College pre-hook: findById returns null if college is archived
-    const parentCollege = await College.findById(location.college_id).select('_id');
+    const parentCollege = await College.findById(location.college_id).select(
+        "_id",
+    );
     if (!parentCollege) {
-        return next(new AppError(
-            'Cannot restore this location. Its parent college is archived. Restore the college first.',
-            400
-        ));
+        return next(
+            new AppError(
+                "Cannot restore this location. Its parent college is archived. Restore the college first.",
+                400,
+            ),
+        );
     }
 
     // Step 3: Safe to restore now
     location.isArchived = false;
+    location.archivedAt = null;
     await location.save({ validateBeforeSave: false });
 
-    res.status(200).json({ status: 'success', data: { location } });
+    res.status(200).json({ status: "success", data: { location } });
 });

@@ -33,6 +33,7 @@
     "nodemailer": "^7.0.11",
     "perfect-express-sanitizer": "^2.0.2",
     "toobusy-js": "^0.5.1",
+    "xlsx": "^0.18.5",
     "xss-clean": "^0.1.4"
   },
   "devDependencies": {

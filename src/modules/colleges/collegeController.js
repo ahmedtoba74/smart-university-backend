@@ -1,24 +1,31 @@
-import College from '../../../DB/models/collegeModel.js';
-import Department from '../../../DB/models/departmentModel.js';
-import User from '../../../DB/models/userModel.js';
-import APIFeatures from '../../utils/apiFeatures.js';
-import catchAsync from '../../utils/catchAsync.js';
-import AppError from '../../utils/appError.js';
+import College from "../../../DB/models/collegeModel.js";
+import Department from "../../../DB/models/departmentModel.js";
+import User from "../../../DB/models/userModel.js";
+import APIFeatures from "../../utils/apiFeatures.js";
+import catchAsync from "../../utils/catchAsync.js";
+import AppError from "../../utils/appError.js";
 import {
     applyIsArchivedGuard,
     applyFieldsGuard,
-    filterReqBody
-} from '../../utils/controllerUtils.js';
+    filterReqBody,
+    buildIdOrSlugFilter,
+} from "../../utils/controllerUtils.js";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const ADMIN_ROLES = ['universityAdmin', 'collegeAdmin'];
+const ADMIN_ROLES = ["universityAdmin", "collegeAdmin"];
 
 /** Fields allowed when creating a college */
-const CREATE_ALLOWED = ['name', 'code', 'description', 'dean_id', 'establishedYear'];
+const CREATE_ALLOWED = [
+    "name",
+    "code",
+    "description",
+    "dean_id",
+    "establishedYear",
+];
 
 /** Fields allowed when updating a college (whitelist — never blacklist) */
-const UPDATE_ALLOWED = ['name', 'description', 'dean_id', 'establishedYear'];
+const UPDATE_ALLOWED = ["name", "description", "dean_id", "establishedYear"];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -31,8 +38,15 @@ const UPDATE_ALLOWED = ['name', 'description', 'dean_id', 'establishedYear'];
 const enrichWithCounts = async (collegeObj) => {
     const [deptCount, studentCount] = await Promise.all([
         // Explicit isArchived:false — never count archived departments
-        Department.countDocuments({ college_id: collegeObj._id, isArchived: false }),
-        User.countDocuments({ college_id: collegeObj._id, role: 'student', active: true })
+        Department.countDocuments({
+            college_id: collegeObj._id,
+            isArchived: false,
+        }),
+        User.countDocuments({
+            college_id: collegeObj._id,
+            role: "student",
+            active: true,
+        }),
     ]);
     return { ...collegeObj, deptCount, studentCount };
 };
@@ -55,13 +69,17 @@ export const getAllColleges = catchAsync(async (req, res, next) => {
     const isAdmin = ADMIN_ROLES.includes(req.user.role);
 
     const features = new APIFeatures(
-        College.find(req.archivedFilter).populate('dean_id', 'name email'),
-        req.query
-    ).filter().sort().limitFields().paginate();
+        College.find(req.archivedFilter).populate("dean_id", "name email"),
+        req.query,
+    )
+        .filter()
+        .sort()
+        .limitFields()
+        .paginate();
 
     const [colleges, totalResults] = await Promise.all([
         features.query,
-        features.countTotal(College, req.archivedFilter)
+        features.countTotal(College, req.archivedFilter),
     ]);
 
     // Role-based projection: non-admins see limited fields
@@ -69,24 +87,24 @@ export const getAllColleges = catchAsync(async (req, res, next) => {
     if (isAdmin) {
         // Enrich each college with department and student counts (parallel)
         data = await Promise.all(
-            colleges.map(c => enrichWithCounts(c.toObject()))
+            colleges.map((c) => enrichWithCounts(c.toObject())),
         );
     } else {
-        data = colleges.map(c => ({
+        data = colleges.map((c) => ({
             _id: c._id,
             name: c.name,
             code: c.code,
-            description: c.description
+            description: c.description,
         }));
     }
 
     res.status(200).json({
-        status: 'success',
+        status: "success",
         results: data.length,
         currentPage: features.page,
         totalPages: Math.ceil(totalResults / features.limit),
         totalResults,
-        data: { colleges: data }
+        data: { colleges: data },
     });
 });
 
@@ -102,11 +120,15 @@ export const getCollege = catchAsync(async (req, res, next) => {
 
     const isAdmin = ADMIN_ROLES.includes(req.user.role);
 
-    // Build filter from archivedFilter + id
-    const filter = { _id: req.params.id, ...req.archivedFilter };
+    // Supports both ObjectId and slug: /colleges/64f... OR /colleges/college-of-engineering
+    const idFilter = buildIdOrSlugFilter(req.params.id);
+    const filter = { ...idFilter, ...req.archivedFilter };
 
-    const college = await College.findOne(filter).populate('dean_id', 'name email role');
-    if (!college) return next(new AppError('College not found.', 404));
+    const college = await College.findOne(filter).populate(
+        "dean_id",
+        "name email role",
+    );
+    if (!college) return next(new AppError("College not found.", 404));
 
     let data;
     if (isAdmin) {
@@ -116,11 +138,11 @@ export const getCollege = catchAsync(async (req, res, next) => {
             _id: college._id,
             name: college.name,
             code: college.code,
-            description: college.description
+            description: college.description,
         };
     }
 
-    res.status(200).json({ status: 'success', data: { college: data } });
+    res.status(200).json({ status: "success", data: { college: data } });
 });
 
 /**
@@ -133,25 +155,37 @@ export const createCollege = catchAsync(async (req, res, next) => {
     const body = filterReqBody(req.body, CREATE_ALLOWED);
 
     if (!body.name || !body.code) {
-        return next(new AppError('College name and code are required.', 400));
+        return next(new AppError("College name and code are required.", 400));
     }
 
     // Validate dean_id if provided
     if (body.dean_id) {
-        const dean = await User.findById(body.dean_id).select('_id active role');
+        const dean = await User.findById(body.dean_id).select(
+            "_id active role",
+        );
         if (!dean || !dean.active) {
-            return next(new AppError('The specified dean does not exist or is inactive.', 404));
+            return next(
+                new AppError(
+                    "The specified dean does not exist or is inactive.",
+                    404,
+                ),
+            );
         }
         // [SECURITY] Prevent assigning inappropriate roles as dean
-        const VALID_DEAN_ROLES = ['doctor', 'universityAdmin', 'collegeAdmin'];
+        const VALID_DEAN_ROLES = ["doctor", "universityAdmin", "collegeAdmin"];
         if (!VALID_DEAN_ROLES.includes(dean.role)) {
-            return next(new AppError('The specified user cannot be assigned as dean.', 400));
+            return next(
+                new AppError(
+                    "The specified user cannot be assigned as dean.",
+                    400,
+                ),
+            );
         }
     }
 
     const college = await College.create(body);
 
-    res.status(201).json({ status: 'success', data: { college } });
+    res.status(201).json({ status: "success", data: { college } });
 });
 
 /**
@@ -165,31 +199,43 @@ export const updateCollege = catchAsync(async (req, res, next) => {
     const filteredBody = filterReqBody(req.body, UPDATE_ALLOWED);
 
     if (Object.keys(filteredBody).length === 0) {
-        return next(new AppError('No valid fields to update.', 400));
+        return next(new AppError("No valid fields to update.", 400));
     }
 
     // Validate dean_id if being updated
     if (filteredBody.dean_id) {
-        const dean = await User.findById(filteredBody.dean_id).select('_id active role');
+        const dean = await User.findById(filteredBody.dean_id).select(
+            "_id active role",
+        );
         if (!dean || !dean.active) {
-            return next(new AppError('The specified dean does not exist or is inactive.', 404));
+            return next(
+                new AppError(
+                    "The specified dean does not exist or is inactive.",
+                    404,
+                ),
+            );
         }
-        const VALID_DEAN_ROLES = ['doctor', 'universityAdmin', 'collegeAdmin'];
+        const VALID_DEAN_ROLES = ["doctor", "universityAdmin", "collegeAdmin"];
         if (!VALID_DEAN_ROLES.includes(dean.role)) {
-            return next(new AppError('The specified user cannot be assigned as dean.', 400));
+            return next(
+                new AppError(
+                    "The specified user cannot be assigned as dean.",
+                    400,
+                ),
+            );
         }
     }
 
     // Pre-hook filters archived colleges — null means either not found or archived
-    const college = await College.findByIdAndUpdate(
-        req.params.id,
-        filteredBody,
-        { new: true, runValidators: true }
-    ).populate('dean_id', 'name email');
+    const idFilter = buildIdOrSlugFilter(req.params.id);
+    const college = await College.findOneAndUpdate(idFilter, filteredBody, {
+        new: true,
+        runValidators: true,
+    }).populate("dean_id", "name email");
 
-    if (!college) return next(new AppError('College not found.', 404));
+    if (!college) return next(new AppError("College not found.", 404));
 
-    res.status(200).json({ status: 'success', data: { college } });
+    res.status(200).json({ status: "success", data: { college } });
 });
 
 /**
@@ -199,23 +245,30 @@ export const updateCollege = catchAsync(async (req, res, next) => {
  */
 export const archiveCollege = catchAsync(async (req, res, next) => {
     // Pre-hook hides archived colleges — findById here returns null if already archived
-    const college = await College.findById(req.params.id);
-    if (!college) return next(new AppError('College not found.', 404));
+    const idFilter = buildIdOrSlugFilter(req.params.id);
+    const college = await College.findOne(idFilter);
+    if (!college) return next(new AppError("College not found.", 404));
 
     // Guard: prevent orphaning active departments
     // Department pre-hook filters to active (isArchived:false) ones automatically
-    const activeDeptCount = await Department.countDocuments({ college_id: req.params.id, isArchived: false });
+    const activeDeptCount = await Department.countDocuments({
+        college_id: req.params.id,
+        isArchived: false,
+    });
     if (activeDeptCount > 0) {
-        return next(new AppError(
-            `Cannot archive this college. It still has ${activeDeptCount} active department(s). Archive all departments first.`,
-            400
-        ));
+        return next(
+            new AppError(
+                `Cannot archive this college. It still has ${activeDeptCount} active department(s). Archive all departments first.`,
+                400,
+            ),
+        );
     }
 
     college.isArchived = true;
+    college.archivedAt = new Date();
     await college.save({ validateBeforeSave: false });
 
-    res.status(204).json({ status: 'success', data: null });
+    res.status(204).json({ status: "success", data: null });
 });
 
 /**
@@ -225,16 +278,19 @@ export const archiveCollege = catchAsync(async (req, res, next) => {
  * Returns 404 if not found OR if already active (no info leakage).
  */
 export const restoreCollege = catchAsync(async (req, res, next) => {
+    const idFilter = buildIdOrSlugFilter(req.params.id);
     const college = await College.findOneAndUpdate(
-        { _id: req.params.id, isArchived: true },
-        { isArchived: false },
-        { new: true, runValidators: false }
-    ).populate('dean_id', 'name email');
+        { ...idFilter, isArchived: true },
+        { isArchived: false, archivedAt: null },
+        { new: true, runValidators: false },
+    ).populate("dean_id", "name email");
 
     // null = either doesn't exist OR was already active
     if (!college) {
-        return next(new AppError('College not found or is already active.', 404));
+        return next(
+            new AppError("College not found or is already active.", 404),
+        );
     }
 
-    res.status(200).json({ status: 'success', data: { college } });
+    res.status(200).json({ status: "success", data: { college } });
 });

@@ -1,4 +1,5 @@
-import AppError from './appError.js';
+import mongoose from "mongoose";
+import AppError from "./appError.js";
 
 // ============================================
 // SHARED CONTROLLER UTILITIES
@@ -10,8 +11,14 @@ import AppError from './appError.js';
  * proactively to prevent information about their existence leaking.
  */
 const PROTECTED_FIELDS = [
-    'password', 'tempPassword', 'nationalID', 'nationalIDHash',
-    'passwordResetToken', 'passwordResetExpires', 'twoFAToken', 'twoFATokenExpires'
+    "password",
+    "tempPassword",
+    "nationalID",
+    "nationalIDHash",
+    "passwordResetToken",
+    "passwordResetExpires",
+    "twoFAToken",
+    "twoFATokenExpires",
 ];
 
 /**
@@ -29,32 +36,39 @@ const PROTECTED_FIELDS = [
  * @returns {boolean}
  */
 export const applyIsArchivedGuard = (req, next) => {
-    const VALID_VALUES = ['true', 'false', 'all'];
+    const VALID_VALUES = ["true", "false", "all"];
     const raw = req.query.isArchived;
 
     if (raw === undefined) {
-        req.archivedFilter = {};  // pre-hook handles default (active only)
+        req.archivedFilter = {}; // pre-hook handles default (active only)
         return true;
     }
 
     // Reject objects: ?isArchived[$ne]=true arrives as an object, not a string
-    if (typeof raw !== 'string' || !VALID_VALUES.includes(raw)) {
-        next(new AppError('Invalid value for isArchived. Allowed: true, false, all.', 400));
+    if (typeof raw !== "string" || !VALID_VALUES.includes(raw)) {
+        next(
+            new AppError(
+                "Invalid value for isArchived. Allowed: true, false, all.",
+                400,
+            ),
+        );
         return false;
     }
 
-    const isAdminRole = ['universityAdmin', 'collegeAdmin'].includes(req.user.role);
+    const isAdminRole = ["universityAdmin", "collegeAdmin"].includes(
+        req.user.role,
+    );
 
     if (!isAdminRole) {
         // Non-admins always see active items — strip the param entirely
         delete req.query.isArchived;
         req.archivedFilter = {};
-    } else if (raw === 'all') {
+    } else if (raw === "all") {
         // Delete from query so apiFeatures.filter() doesn't try to JSON-serialize it
         // Set archivedFilter for controllers to merge into the base query directly
         delete req.query.isArchived;
         req.archivedFilter = { isArchived: { $in: [true, false] } };
-    } else if (raw === 'true') {
+    } else if (raw === "true") {
         delete req.query.isArchived;
         req.archivedFilter = { isArchived: true };
     } else {
@@ -82,11 +96,16 @@ export const applyIsArchivedGuard = (req, next) => {
 export const applyFieldsGuard = (req, next) => {
     if (!req.query.fields) return true;
 
-    const requested = req.query.fields.split(',').map(f => f.trim());
-    const blocked = requested.filter(f => PROTECTED_FIELDS.includes(f));
+    const requested = req.query.fields.split(",").map((f) => f.trim());
+    const blocked = requested.filter((f) => PROTECTED_FIELDS.includes(f));
 
     if (blocked.length > 0) {
-        next(new AppError(`Access to protected fields is not allowed: ${blocked.join(', ')}.`, 403));
+        next(
+            new AppError(
+                `Access to protected fields is not allowed: ${blocked.join(", ")}.`,
+                403,
+            ),
+        );
         return false;
     }
 
@@ -106,7 +125,7 @@ export const applyFieldsGuard = (req, next) => {
  */
 export const filterReqBody = (body, allowedFields) => {
     const filteredBody = {};
-    allowedFields.forEach(field => {
+    allowedFields.forEach((field) => {
         if (body[field] !== undefined) {
             filteredBody[field] = body[field];
         }
@@ -126,10 +145,65 @@ export const filterReqBody = (body, allowedFields) => {
  * @param {string} scopeField - the field to scope by (default: 'college_id')
  * @returns {Object} MongoDB filter
  */
-export const buildOwnershipFilter = (id, user, scopeField = 'college_id') => {
-    const filter = { _id: id };
-    if (user.role === 'collegeAdmin') {
+export const buildOwnershipFilter = (
+    param,
+    user,
+    scopeField = "college_id",
+    slugField = "slug",
+) => {
+    const filter = buildIdOrSlugFilter(param, slugField);
+    if (user.role === "collegeAdmin") {
         filter[scopeField] = user.college_id;
     }
     return filter;
+};
+
+// ============================================
+// SLUG UTILITIES
+// ============================================
+
+/**
+ * Builds a MongoDB filter that supports both ObjectId and slug lookup.
+ * If param is a valid 24-char hex ObjectId → filter by _id.
+ * Otherwise → filter by the slug field (slug, code, etc.).
+ *
+ * @param {string} param - req.params.id (either ObjectId string or slug)
+ * @param {string} slugField - field name to match against (default: 'slug')
+ * @returns {Object} MongoDB filter: { _id } | { [slugField] }
+ */
+export const buildIdOrSlugFilter = (param, slugField = "slug") => {
+    return mongoose.Types.ObjectId.isValid(param)
+        ? { _id: param }
+        : { [slugField]: param };
+};
+
+// ============================================
+// NESTED ROUTE MIDDLEWARE
+// ============================================
+
+/**
+ * Middleware for nested college routes (e.g. GET /colleges/:id/departments).
+ * Resolves the college from :id (ObjectId or slug), then sets req.scopeFilter
+ * so that the downstream department/location controller is automatically scoped.
+ *
+ * Usage in collegeRouter:
+ *   router.get('/:id/departments', restrictTo('universityAdmin'), resolveCollegeParam, getAllDepartments);
+ */
+export const resolveCollegeParam = async (req, res, next) => {
+    try {
+        // Lazy import to avoid circular dependency at module load time
+        const { default: College } =
+            await import("../../DB/models/collegeModel.js");
+
+        const filter = buildIdOrSlugFilter(req.params.id);
+        const college = await College.findOne(filter).select("_id");
+
+        if (!college) return next(new AppError("College not found.", 404));
+
+        // Override scopeFilter — downstream controllers use this for all queries
+        req.scopeFilter = { college_id: college._id };
+        next();
+    } catch (err) {
+        next(err);
+    }
 };
