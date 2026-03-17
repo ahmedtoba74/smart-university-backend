@@ -98,13 +98,14 @@ const userSchema = new mongoose.Schema(
             required: [true, "National ID is required"],
             select: false,
             validate: {
-                validator: function(v) {
+                validator: function (v) {
                     // Runs on plain text — encryption happens in pre-save hook AFTER validation
                     // For findOneAndUpdate, pass { runValidators: true } in options
                     return /^[0-9]{14}$/.test(v);
                 },
-                message: props => `${props.value} is not a valid national ID!`
-            }
+                message: (props) =>
+                    `${props.value} is not a valid national ID!`,
+            },
         },
         /** * @field nationalIDHash - One-way deterministic hash. Used for searching and uniqueness enforcement.
          */

@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @project   Smart University Platform
+ * @file      userRouter.js
+ * @desc      Express router for the Users module containing nested route structures,
+ * strict ordering for static/dynamic routes, and parameter interceptors.
+ * @author    Ahmed Toba <ahmed.toba.mahmoud@gmail.com>
+ * @version   1.0.0
+ * ===================================================================================
+ */
 import express from "express";
 import * as userController from "./userController.js";
 import {
@@ -13,8 +23,9 @@ const router = express.Router({ mergeParams: true });
 
 // ── Interceptor ───────────────────────────────────────────────────────
 export const setNestedUserFilters = (req, res, next) => {
-    if (req.params.collegeId)    req.query.college_id    = req.params.collegeId;
-    if (req.params.departmentId) req.query.department_id = req.params.departmentId;
+    if (req.params.collegeId) req.query.college_id = req.params.collegeId;
+    if (req.params.departmentId)
+        req.query.department_id = req.params.departmentId;
     next();
 };
 router.use(setNestedUserFilters);
@@ -27,7 +38,7 @@ router.get(
     protect,
     enforcePasswordChange,
     userController.getMe,
-    userController.getUser   // ← getMe sets req.params.id then calls next()
+    userController.getUser,
 );
 
 // POST /lookup
@@ -37,7 +48,7 @@ router.post(
     enforcePasswordChange,
     restrictTo("universityAdmin", "collegeAdmin"),
     attachCollegeScope,
-    userController.lookupUserByNationalID
+    userController.lookupUserByNationalID,
 );
 
 // POST /bulk-import
@@ -48,7 +59,7 @@ router.post(
     restrictTo("universityAdmin", "collegeAdmin"),
     attachCollegeScope,
     uploadMix([{ name: "file", maxCount: 1 }], fileValidation.file),
-    userController.bulkImportUsers
+    userController.bulkImportUsers,
 );
 
 // PATCH /bulk-actions
@@ -58,7 +69,7 @@ router.patch(
     enforcePasswordChange,
     restrictTo("universityAdmin", "collegeAdmin"),
     attachCollegeScope,
-    userController.bulkActions
+    userController.bulkActions,
 );
 
 // PATCH /allocate
@@ -68,7 +79,7 @@ router.patch(
     enforcePasswordChange,
     restrictTo("collegeAdmin"),
     attachCollegeScope,
-    userController.allocateUsers
+    userController.allocateUsers,
 );
 
 // PATCH /resend-credentials
@@ -77,7 +88,7 @@ router.patch(
     protect,
     enforcePasswordChange,
     restrictTo("universityAdmin", "collegeAdmin"),
-    userController.resendCredentials
+    userController.resendCredentials,
     // No attachCollegeScope — scope check is done manually inside controller via log.college_id
 );
 
@@ -90,7 +101,7 @@ router.get(
     enforcePasswordChange,
     restrictTo("universityAdmin", "collegeAdmin", "ta", "doctor"),
     attachCollegeScope,
-    userController.getAllUsers
+    userController.getAllUsers,
 );
 
 // POST / — create user
@@ -101,7 +112,7 @@ router.post(
     restrictTo("universityAdmin", "collegeAdmin"),
     attachCollegeScope,
     uploadMix([{ name: "photo", maxCount: 1 }], fileValidation.image),
-    userController.createUser
+    userController.createUser,
 );
 
 // ── DYNAMIC ROUTES ────────────────────────────────────────────────────
@@ -113,7 +124,7 @@ router.get(
     enforcePasswordChange,
     restrictTo("universityAdmin", "collegeAdmin", "ta", "doctor"),
     attachCollegeScope,
-    userController.getUser
+    userController.getUser,
 );
 
 // PATCH /:id — general update
@@ -124,7 +135,7 @@ router.patch(
     restrictTo("universityAdmin", "collegeAdmin"),
     attachCollegeScope,
     uploadMix([{ name: "photo", maxCount: 1 }], fileValidation.image),
-    userController.updateUser
+    userController.updateUser,
 );
 
 // PATCH /:id/deactivate
@@ -134,7 +145,7 @@ router.patch(
     enforcePasswordChange,
     restrictTo("universityAdmin", "collegeAdmin"),
     attachCollegeScope,
-    userController.deactivateUser
+    userController.deactivateUser,
 );
 
 // PATCH /:id/restore
@@ -143,7 +154,7 @@ router.patch(
     protect,
     enforcePasswordChange,
     restrictTo("universityAdmin"),
-    userController.restoreUser
+    userController.restoreUser,
 );
 
 // PATCH /:id/unlock
@@ -152,7 +163,7 @@ router.patch(
     protect,
     enforcePasswordChange,
     restrictTo("universityAdmin"),
-    userController.unlockUser
+    userController.unlockUser,
 );
 
 // PATCH /:id/force-logout
@@ -161,7 +172,7 @@ router.patch(
     protect,
     enforcePasswordChange,
     restrictTo("universityAdmin"),
-    userController.forceLogoutUser
+    userController.forceLogoutUser,
 );
 
 // PATCH /:id/reset-password
@@ -171,7 +182,7 @@ router.patch(
     enforcePasswordChange,
     restrictTo("universityAdmin", "collegeAdmin"),
     attachCollegeScope,
-    userController.resetUserPassword
+    userController.resetUserPassword,
 );
 
 // PATCH /:id/role
@@ -180,7 +191,7 @@ router.patch(
     protect,
     enforcePasswordChange,
     restrictTo("universityAdmin"),
-    userController.changeUserRole
+    userController.changeUserRole,
 );
 
 // PATCH /:id/assign-rfid
@@ -190,7 +201,7 @@ router.patch(
     enforcePasswordChange,
     restrictTo("collegeAdmin"),
     attachCollegeScope,
-    userController.assignRfid
+    userController.assignRfid,
 );
 
 // PATCH /:id/graduate
@@ -200,7 +211,7 @@ router.patch(
     enforcePasswordChange,
     restrictTo("collegeAdmin"),
     attachCollegeScope,
-    userController.graduateUser
+    userController.graduateUser,
 );
 
 export default router;
