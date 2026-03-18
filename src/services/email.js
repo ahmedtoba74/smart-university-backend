@@ -1,5 +1,5 @@
-import nodemailer from 'nodemailer';
-import { htmlToText } from 'html-to-text';
+import nodemailer from "nodemailer";
+import { htmlToText } from "html-to-text";
 
 /**
  * Email Service Class to handle sending emails.
@@ -16,7 +16,7 @@ export default class Email {
      */
     constructor(user, url) {
         this.to = user.email;
-        this.firstName = user.name.split(' ')[0] || 'User';
+        this.firstName = user.name.split(" ")[0] || "User";
         this.url = url;
         this.from = `Smart University <${process.env.EMAIL_FROM}>`;
     }
@@ -26,7 +26,7 @@ export default class Email {
      * @returns {Object} Nodemailer transport object.
      */
     newTransport() {
-        if (process.env.NODE_ENV === 'production') {
+        if (process.env.NODE_ENV === "production") {
             // Brevo (Sendinblue) Configuration
             return nodemailer.createTransport({
                 host: process.env.BREVO_HOST,
@@ -34,8 +34,8 @@ export default class Email {
                 secure: false, // Brevo بيستخدم بورت 587 مع starttls، يبقى secure: false
                 auth: {
                     user: process.env.BREVO_USER,
-                    pass: process.env.BREVO_PASSWORD
-                }
+                    pass: process.env.BREVO_PASSWORD,
+                },
             });
         }
 
@@ -45,8 +45,8 @@ export default class Email {
             port: process.env.EMAIL_PORT,
             auth: {
                 user: process.env.EMAIL_USERNAME,
-                pass: process.env.EMAIL_PASSWORD
-            }
+                pass: process.env.EMAIL_PASSWORD,
+            },
         });
     }
 
@@ -63,7 +63,7 @@ export default class Email {
             to: this.to,
             subject,
             html: message,
-            text: htmlToText(message)
+            text: htmlToText(message),
         };
 
         await this.newTransport().sendMail(mailOptions);
@@ -76,8 +76,8 @@ export default class Email {
      */
     async sendWelcome() {
         await this.send(
-            'Welcome to the Smart University Family!',
-            `<h1>Hi ${this.firstName},</h1><p>Welcome to our platform. Please click <a href="${this.url}">here</a> to complete your profile.</p>`
+            "Welcome to the Smart University Family!",
+            `<h1>Hi ${this.firstName},</h1><p>Welcome to our platform. Please click <a href="${this.url}">here</a> to complete your profile.</p>`,
         );
     }
 
@@ -88,7 +88,7 @@ export default class Email {
      */
     async sendPasswordReset() {
         await this.send(
-            '🔒 Reset your password',
+            "🔒 Reset your password",
             `
             <!DOCTYPE html>
             <html lang="en">
@@ -256,7 +256,7 @@ export default class Email {
                 </div>
             </body>
             </html>
-            `
+            `,
         );
     }
 
@@ -344,7 +344,102 @@ export default class Email {
                 </div>
             </body>
             </html>
+            `,
+        );
+    }
+
+    /**
+     * Send user credentials email.
+     * @async
+     * @param {string} password - The user's temporary password.
+     * @returns {Promise<void>}
+     */
+    async sendCredentials(password) {
+        await this.send(
+            `🔐 Your Account Credentials`,
             `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Account Credentials</title>
+                <style>
+                    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+                    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+                    img { -ms-interpolation-mode: bicubic; }
+                    body { margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+                    .wrapper { width: 100%; table-layout: fixed; background-color: #f3f4f6; padding-bottom: 40px; }
+                    .main-content { background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); overflow: hidden; }
+                    h1 { color: #111827; font-size: 24px; font-weight: 700; margin: 0 0 16px; text-align: center; }
+                    p { color: #4b5563; font-size: 16px; line-height: 24px; margin: 0 0 16px; }
+                    .footer { padding-top: 24px; text-align: center; color: #9ca3af; font-size: 12px; }
+                    @media screen and (max-width: 600px) { .main-content { width: 100% !important; border-radius: 0 !important; } .content-padding { padding: 24px !important; } }
+                </style>
+            </head>
+            <body>
+                <div class="wrapper">
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                        <tr>
+                            <td align="center" style="padding: 40px 10px;">
+                                
+                                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px;">
+                                    <tr>
+                                        <td align="center" style="padding-bottom: 20px;">
+                                            <h2 style="margin: 0; color: #1e3a8a; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">🎓 Smart University</h2>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <table border="0" cellpadding="0" cellspacing="0" width="100%" class="main-content">
+                                    <tr><td bgcolor="#2563eb" style="height: 6px;"></td></tr>
+                                    <tr>
+                                        <td class="content-padding" style="padding: 40px;">
+                                            <div style="text-align: center; margin-bottom: 20px;">
+                                                <div style="display: inline-block; padding: 12px; background-color: #eff6ff; border-radius: 50%;">
+                                                    <span style="font-size: 30px;">🔐</span>
+                                                </div>
+                                            </div>
+
+                                            <h1>Account Credentials</h1>
+                                            
+                                            <p style="text-align: center;">Hi <strong>${this.firstName}</strong>,</p>
+                                            <p style="text-align: center;">Welcome to Smart University! Here are your account credentials:</p>
+
+                                            <p style="text-align: center; margin-bottom: 10px;">
+                                                <strong>Email:</strong> ${this.to}
+                                            </p>
+
+                                            <p style="text-align: center; margin-bottom: 5px;">
+                                                <strong>Temporary Password:</strong>
+                                            </p>
+
+                                            <div style="text-align: center; margin: 15px 0 30px 0;">
+                                                <span style="font-size: 24px; font-weight: 800; letter-spacing: 2px; color: #1e3a8a; background-color: #f3f4f6; padding: 15px 30px; border-radius: 8px; border: 1px solid #e5e7eb; display: inline-block;">
+                                                    ${password}
+                                                </span>
+                                            </div>
+
+                                            <p style="font-size: 14px; color: #6b7280; text-align: center; margin-bottom: 0;">
+                                                Please log in and change your password immediately.
+                                                <br>Do not share these credentials with anyone.
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <div class="footer">
+                                    <p>Smart University Platform<br>Beni-Suef, Egypt</p>
+                                    <p style="margin-top: 10px;">If you have any issues, please contact the administration.</p>
+                                </div>
+
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </body>
+            </html>
+            `,
         );
     }
 }

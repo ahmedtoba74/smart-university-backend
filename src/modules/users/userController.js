@@ -490,7 +490,13 @@ export const restoreUser = catchAsync(async (req, res, next) => {
     await user.save({ validateBeforeSave: false });
 
     // 5. Response
-    res.status(204).send();
+    res.status(200).json({
+        status: "success",
+        message: "User restored successfully",
+        data: {
+            user,
+        },
+    });
 });
 
 /**
@@ -669,10 +675,10 @@ export const changeUserRole = catchAsync(async (req, res, next) => {
  * @returns {Promise<void>} Sends a JSON response with the assigned RFID.
  */
 export const assignRfid = catchAsync(async (req, res, next) => {
-    const rfid = req.body.rfid?.trim();
+    const rfidTag = req.body.rfidTag?.trim();
 
-    if (!rfid) {
-        return next(new AppError("RFID is required", 400));
+    if (!rfidTag) {
+        return next(new AppError("rfidTag is required", 400));
     }
 
     // 1. Find User
@@ -683,7 +689,7 @@ export const assignRfid = catchAsync(async (req, res, next) => {
     }
 
     // 2. Check if RFID is already assigned to a DIFFERENT user
-    const existingUserWithRfid = await User.findOne({ rfid }).setOptions({
+    const existingUserWithRfid = await User.findOne({ rfidTag }).setOptions({
         skipActiveCheck: true,
     });
 
@@ -697,14 +703,14 @@ export const assignRfid = catchAsync(async (req, res, next) => {
     }
 
     // 3. Update & Save
-    user.rfid = rfid;
+    user.rfidTag = rfidTag;
     await user.save({ validateBeforeSave: false });
 
     // 4. Response
     res.status(200).json({
         status: "success",
         data: {
-            rfid: user.rfid,
+            rfidTag: user.rfidTag,
         },
     });
 });
@@ -766,19 +772,22 @@ export const graduateUser = catchAsync(async (req, res, next) => {
  * @returns {Promise<void>} Sends a JSON response with the update result.
  */
 export const allocateUsers = catchAsync(async (req, res, next) => {
-    const { userIds, department_id } = req.body;
+    const { studentIds, targetDepartmentId } = req.body;
 
-    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+    if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
         return next(
-            new AppError("Please provide a non-empty array of userIds.", 400),
+            new AppError(
+                "Please provide a non-empty array of studentIds.",
+                400,
+            ),
         );
     }
 
-    if (!department_id) {
-        return next(new AppError("Please provide a department_id.", 400));
+    if (!targetDepartmentId) {
+        return next(new AppError("Please provide a targetDepartmentId.", 400));
     }
 
-    if (userIds.length > MAX_BULK_IDS) {
+    if (studentIds.length > MAX_BULK_IDS) {
         return next(
             new AppError(
                 `Cannot allocate more than ${MAX_BULK_IDS} users at once.`,
@@ -788,7 +797,7 @@ export const allocateUsers = catchAsync(async (req, res, next) => {
     }
 
     // 1. Verify destination department exists and matches college scope (if applicable)
-    const departmentQuery = { _id: department_id };
+    const departmentQuery = { _id: targetDepartmentId };
     if (req.user.role === "collegeAdmin") {
         departmentQuery.college_id = req.user.college_id;
     }
@@ -808,7 +817,7 @@ export const allocateUsers = catchAsync(async (req, res, next) => {
     // Also apply req.scopeFilter (which limits to req.user.college_id for collegeAdmins).
     const result = await User.updateMany(
         {
-            _id: { $in: userIds },
+            _id: { $in: studentIds },
             college_id: department.college_id,
             ...req.scopeFilter,
         },
@@ -818,7 +827,7 @@ export const allocateUsers = catchAsync(async (req, res, next) => {
 
     res.status(200).json({
         status: "success",
-        message: `${result.modifiedCount} users allocated successfully out of ${userIds.length} requested.`,
+        message: `${result.modifiedCount} users allocated successfully out of ${studentIds.length} requested.`,
         data: {
             matchedCount: result.matchedCount,
             modifiedCount: result.modifiedCount,

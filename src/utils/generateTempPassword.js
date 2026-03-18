@@ -20,7 +20,7 @@ export const generateTempPassword = () => {
     const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const lower = "abcdefghijklmnopqrstuvwxyz";
     const digits = "0123456789";
-    const symbols = "@#$!%*?&";
+    const symbols = "@$!%*?_#-";
     const all = upper + lower + digits + symbols;
 
     // Guarantee at least one character from EACH category
