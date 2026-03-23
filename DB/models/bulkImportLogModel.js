@@ -30,7 +30,7 @@ const bulkImportLogSchema = new mongoose.Schema({
             row: { type: Number },
             name: { type: String },
             email: { type: String },
-            nationalID: { type: String }, // Plain — internal admin log, never exposed to API consumers
+            nationalID: { type: String },
             userId: {
                 type: mongoose.Schema.Types.ObjectId,
                 ref: "User",

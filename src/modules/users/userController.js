@@ -16,7 +16,7 @@ import Email from "../../services/email.js";
 import xlsx from "xlsx";
 
 const MAX_BULK_IDS = 500;
-const MAX_ROWS = 1000;
+const MAX_ROWS = 500;
 
 const ALLOWED_ROLES = [
     "student",
@@ -279,34 +279,18 @@ export const updateUser = catchAsync(async (req, res, next) => {
         return next(new AppError("User not found", 404));
     }
 
-    // 2. Strip Forbidden Fields
-    const FORBIDDEN_FIELDS = [
-        "password",
-        "passwordConfirm",
-        "gpa",
-        "earnedCredits",
-        "level",
-        "active",
-        "requiresPasswordChange",
-        "tokensInvalidatedAt",
-        "college_id",
-        "nationalID",
-        "nationalIDHash",
-        "credentialEmailSent",
-        "loginAttempts",
-        "lockUntil",
-        "lockoutStage",
-        "twoFactorSecret",
-        "twoFactorExpires",
-        "passwordResetToken",
-        "passwordResetExpires",
-        "passwordChangedAt",
-        "lastLoginAt",
-        "role",
+    const ALLOWED_UPDATE_FIELDS = [
+        "name",
+        "email",
+        "phoneNumber",
+        "department_id",
     ];
 
-    const filteredBody = { ...req.body };
-    FORBIDDEN_FIELDS.forEach((field) => delete filteredBody[field]);
+    const filteredBody = {};
+    ALLOWED_UPDATE_FIELDS.forEach((field) => {
+        if (req.body[field] !== undefined)
+            filteredBody[field] = req.body[field];
+    });
 
     // 3. Photo Upload
     if (req.files && req.files.photo) {
@@ -414,6 +398,7 @@ export const deactivateUser = catchAsync(async (req, res, next) => {
  */
 export const getMe = (req, res, next) => {
     req.params.id = req.user.id;
+    req.scopeFilter = {};
     return next();
 };
 
@@ -706,11 +691,13 @@ export const assignRfid = catchAsync(async (req, res, next) => {
     user.rfidTag = rfidTag;
     await user.save({ validateBeforeSave: false });
 
+    user.password = undefined;
+
     // 4. Response
     res.status(200).json({
         status: "success",
         data: {
-            rfidTag: user.rfidTag,
+            user,
         },
     });
 });
@@ -923,16 +910,28 @@ export const bulkActions = catchAsync(async (req, res, next) => {
 
         const department = await Department.findOne({
             _id: payload.departmentId,
-            college_id: req.user.college_id,
         });
         if (!department) {
+            return next(new AppError("Department not found.", 404));
+        }
+
+        const sampleUser = await User.findOne(scopedFilter);
+        if (
+            sampleUser &&
+            department.college_id.toString() !==
+                sampleUser.college_id.toString()
+        ) {
             return next(
-                new AppError("Department not found within your college.", 404),
+                new AppError(
+                    "Target department belongs to a different college than the selected users.",
+                    400,
+                ),
             );
         }
 
         result = await User.updateMany(scopedFilter, {
-            $set: { department_id: payload.departmentId },
+            college_id: department.college_id,
+            $set: { department_id: department._id },
         });
 
         // ── graduate ─────────────────────────────────────────────────
@@ -968,11 +967,13 @@ export const bulkActions = catchAsync(async (req, res, next) => {
                 modified: result.modifiedCount,
                 alreadyGraduated,
                 skippedNonStudents: nonStudents,
-                notFound:
+                notFound: Math.max(
+                    0,
                     uniqueIds.length -
-                    result.matchedCount -
-                    alreadyGraduated -
-                    nonStudents,
+                        result.matchedCount -
+                        alreadyGraduated -
+                        nonStudents,
+                ),
             },
         });
     }
@@ -1024,7 +1025,10 @@ export const bulkImportUsers = catchAsync(async (req, res, next) => {
     // 3. Parse Excel
     let workbook;
     try {
-        workbook = xlsx.read(req.file.buffer, { type: "buffer" });
+        workbook = xlsx.read(req.file.buffer, {
+            type: "buffer",
+            sheetRows: MAX_ROWS + 1,
+        });
     } catch {
         return next(
             new AppError(
@@ -1077,12 +1081,13 @@ export const bulkImportUsers = catchAsync(async (req, res, next) => {
             .toLowerCase();
 
         // Required fields
-        if (!name || !emailStr || !natIdStr || !role) {
+        if (!name || !emailStr || !natIdStr || !role || !phoneStr) {
             failedRecords.push({
                 row: rowNum,
                 name: name || "Unknown",
                 email: emailStr || "Unknown",
                 nationalID: natIdStr || "Unknown",
+                phoneNumber: phoneStr || "Unknown",
                 status: "failed",
                 failReason: "Missing required fields.",
                 userId: null,
@@ -1110,7 +1115,7 @@ export const bulkImportUsers = catchAsync(async (req, res, next) => {
                 row: rowNum,
                 name,
                 email: emailStr,
-                nationalID: natIdStr,
+                nationalID: hashForSearch(natIdStr),
                 status: "failed",
                 failReason: "Invalid national ID format.",
                 userId: null,
@@ -1119,7 +1124,7 @@ export const bulkImportUsers = catchAsync(async (req, res, next) => {
             });
             continue;
         }
-        if (phoneStr && !PHONE_REGEX.test(phoneStr)) {
+        if (!PHONE_REGEX.test(phoneStr)) {
             failedRecords.push({
                 row: rowNum,
                 name,

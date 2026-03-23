@@ -30,6 +30,28 @@ export const setNestedUserFilters = (req, res, next) => {
 };
 router.use(setNestedUserFilters);
 
+// ── Multer Configuration ───────────────────────────────────────────────
+
+import multer from "multer";
+
+const bulkImportUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB hard cap
+    fileFilter: (req, file, cb) => {
+        const allowed = [
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv",
+            "application/vnd.ms-excel",
+        ];
+        if (allowed.includes(file.mimetype)) cb(null, true);
+        else
+            cb(
+                new AppError("Only .xlsx and .csv files are accepted.", 400),
+                false,
+            );
+    },
+});
+
 // ── STATIC ROUTES ─────────────────────────────────────────────────────
 
 // GET /me
@@ -58,7 +80,7 @@ router.post(
     enforcePasswordChange,
     restrictTo("universityAdmin", "collegeAdmin"),
     attachCollegeScope,
-    uploadMix([{ name: "file", maxCount: 1 }], fileValidation.file),
+    bulkImportUpload.single("file"),
     userController.bulkImportUsers,
 );
 
