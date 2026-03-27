@@ -145,7 +145,8 @@ export const attachCollegeScope = (req, res, next) => {
         return next();
     }
 
-    if (req.user.role === "collegeAdmin") {
+    // Support for all college-bound roles defined in Phase 3 Plan
+    if (["collegeAdmin", "doctor", "ta", "student"].includes(req.user.role)) {
         if (!req.user.college_id) {
             return next(
                 new AppError(
@@ -160,5 +161,32 @@ export const attachCollegeScope = (req, res, next) => {
 
     // Safety net: any other role that somehow reaches an admin route
     req.scopeFilter = { _id: null };
+    next();
+};
+
+// ==============================
+// 4. Staff Scope Middleware
+// ==============================
+
+/**
+ * Injects `req.staffFilter` based on the user's teaching role.
+ *
+ * - doctor : only sees offerings where they are in doctors_ids
+ * - ta     : only sees offerings where they are in tas_ids
+ * - other  : no filter → sees everything (relies on attachCollegeScope for security)
+ *
+ * Used primarily for GET /course-offerings list endpoint.
+ */
+export const attachStaffScope = (req, res, next) => {
+    if (req.user.role === "doctor") {
+        req.staffFilter = { doctors_ids: req.user._id };
+        return next();
+    }
+    if (req.user.role === "ta") {
+        req.staffFilter = { tas_ids: req.user._id };
+        return next();
+    }
+
+    req.staffFilter = {};
     next();
 };

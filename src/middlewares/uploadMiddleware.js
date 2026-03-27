@@ -1,8 +1,7 @@
-import multer from 'multer';
-import AppError from '../utils/appError.js';
+import multer from "multer";
+import AppError from "../utils/appError.js";
 
 export const uploadMix = (arrayOfFields, fileType) => {
-    
     // 1. Storage Configuration (Memory)
     const storage = multer.memoryStorage();
 
@@ -11,14 +10,20 @@ export const uploadMix = (arrayOfFields, fileType) => {
         if (fileType.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new AppError('Invalid file type! Please upload only allowed formats.', 400), false);
+            cb(
+                new AppError(
+                    "Invalid file type! Please upload only allowed formats.",
+                    400,
+                ),
+                false,
+            );
         }
     };
 
-    const upload = multer({ 
-        storage, 
+    const upload = multer({
+        storage,
         fileFilter,
-        limits: { fileSize: 50 * 1024 * 1024 } // 50MB Max Size
+        limits: { fileSize: 50 * 1024 * 1024 }, // 50MB Max Size
     });
 
     // 3. Return fields (Support Single, Multiple, Mixed)

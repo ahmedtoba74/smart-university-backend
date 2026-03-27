@@ -194,7 +194,13 @@ const userSchema = new mongoose.Schema(
         },
         academicStatus: {
             type: String,
-            enum: ["good_standing", "probation", "honors", "graduated"],
+            enum: [
+                "good_standing",
+                "probation",
+                "honors",
+                "graduated",
+                "suspended",
+            ],
             default: "good_standing",
         },
         // --- Progressive Lockout Fields ---
@@ -227,6 +233,16 @@ const userSchema = new mongoose.Schema(
         passwordChangedAt: Date,
         passwordResetToken: String,
         passwordResetExpires: Date,
+
+        /**
+         * @field lastEnrollmentAttempt - Write-lock sentinel for the enrollment engine.
+         * Updated inside withTransaction() as the FIRST operation to force
+         * a WriteConflict when two concurrent transactions target the same student.
+         * Prevents the "Phantom Credit Bypass" caused by MongoDB Snapshot Isolation.
+         */
+        lastEnrollmentAttempt: {
+            type: Date,
+        },
     },
     {
         timestamps: true,
@@ -294,7 +310,7 @@ userSchema.pre("save", function () {
  * Pre-find hook: Filter out inactive users (Soft Delete implementation).
  * Applies to all queries starting with 'find'.
  */
-userSchema.pre(/^find/, function () {
+userSchema.pre(/^find|countDocuments/, function () {
     if (this.options && this.options.skipActiveCheck) return;
     this.find({ active: { $ne: false } });
 });

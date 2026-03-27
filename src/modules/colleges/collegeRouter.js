@@ -6,6 +6,7 @@ import { protect, restrictTo } from "../../middlewares/authMiddleware.js";
 import { resolveCollegeParam } from "../../utils/controllerUtils.js";
 import departmentRouter from "../departments/departmentRouter.js";
 import userRouter from "../users/userRouter.js";
+import courseOfferingRouter from "../courseOfferings/courseOfferingRouter.js";
 
 const router = express.Router();
 
@@ -15,6 +16,7 @@ router.use(protect);
 // ─── Nested Route Mounts ──────────────────────────────────────────────────
 router.use("/:collegeId/departments", departmentRouter);
 router.use("/:collegeId/users", userRouter);
+router.use("/:collegeId/course-offerings", courseOfferingRouter);
 
 // ─── Flat CRUD (all authenticated roles for GET, UA for write) ─────────────
 router

@@ -121,7 +121,7 @@ router.get(
     "/",
     protect,
     enforcePasswordChange,
-    restrictTo("universityAdmin", "collegeAdmin", "ta", "doctor"),
+    restrictTo("universityAdmin", "collegeAdmin"),
     attachCollegeScope,
     userController.getAllUsers,
 );
@@ -144,7 +144,7 @@ router.get(
     "/:id",
     protect,
     enforcePasswordChange,
-    restrictTo("universityAdmin", "collegeAdmin", "ta", "doctor"),
+    restrictTo("universityAdmin", "collegeAdmin"),
     attachCollegeScope,
     userController.getUser,
 );
