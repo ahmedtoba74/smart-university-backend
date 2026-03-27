@@ -43,9 +43,6 @@ router.post(
 router.get(
     "/my",
     restrictTo("student"),
-    // attachCollegeScope not strictly needed because we filter by student_id = req.user._id,
-    // but Phase 3 adds college isolation to students anyway.
-    attachCollegeScope,
     enrollmentController.getMyEnrollments,
 );
 
@@ -65,7 +62,6 @@ router
     )
     .post(
         restrictTo("student"),
-        attachCollegeScope,
         enrollmentController.enrollStudent,
     );
 
@@ -79,7 +75,7 @@ router
 router
     .route("/:id")
     .get(
-        restrictTo("universityAdmin", "collegeAdmin"),
+        restrictTo("universityAdmin", "collegeAdmin", "doctor", "ta", "student"),
         attachCollegeScope,
         enrollmentController.getEnrollmentById,
     );

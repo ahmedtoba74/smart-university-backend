@@ -141,8 +141,20 @@ export const createCourse = catchAsync(async (req, res, next) => {
     ];
     const filteredBody = filterReqBody(req.body, allowedFields);
 
-    if (!filteredBody.department_id) {
-        return next(new AppError("Department ID is required.", 400));
+    if (
+        filteredBody.prerequisites_ids &&
+        !Array.isArray(filteredBody.prerequisites_ids)
+    ) {
+        filteredBody.prerequisites_ids = [filteredBody.prerequisites_ids];
+    }
+
+    if (
+        !filteredBody.department_id ||
+        !filteredBody.title ||
+        !filteredBody.code ||
+        !filteredBody.creditHours
+    ) {
+        return next(new AppError("Missing required fields.", 400));
     }
 
     // 1. Validate Department and ensure it's in the admin's scope
@@ -238,24 +250,24 @@ export const getAllCourses = catchAsync(async (req, res, next) => {
         .paginate();
 
     const courses = await features.query.populate({
-        path: "prerequisites_ids",
-        select: "title code",
+        path: "prerequisites_ids department_id college_id",
+        select: "title code name",
     });
 
-    const total = await new APIFeatures(
+    const totalResults = await new APIFeatures(
         CourseCatalog.find(baseQuery),
         req.query,
     )
         .filter()
-        .countTotal();
+        .countTotal(CourseCatalog, baseQuery);
 
     res.status(200).json({
         status: "success",
         results: courses.length,
-        total,
-        data: {
-            courses,
-        },
+        currentPage: features.page,
+        totalPages: Math.ceil(totalResults / features.limit),
+        totalResults,
+        data: { courses },
     });
 });
 
@@ -329,6 +341,13 @@ export const updateCourse = catchAsync(async (req, res, next) => {
         "prerequisites_ids",
     ];
     const filteredBody = filterReqBody(req.body, allowedFields);
+
+    if (
+        filteredBody.prerequisites_ids &&
+        !Array.isArray(filteredBody.prerequisites_ids)
+    ) {
+        filteredBody.prerequisites_ids = [filteredBody.prerequisites_ids];
+    }
 
     if (filteredBody.prerequisites_ids) {
         const isValid = await validatePrerequisites(

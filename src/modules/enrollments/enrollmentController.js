@@ -72,16 +72,27 @@ const verifyPrerequisites = async (studentId, prerequisitesIds) => {
  * @param {Object} settings - Derived global settings controlling active terms.
  * @throws {AppError} Generates a 409 Conflict indicating overlapping constraints.
  */
-const verifyTimeConflicts = async (studentId, incomingOffering, settings) => {
+const verifyTimeConflicts = async (
+    studentId,
+    incomingOffering,
+    settings,
+    session = null,
+) => {
     if (!incomingOffering.schedule || incomingOffering.schedule.length === 0)
         return;
 
-    const activeEnrollments = await Enrollment.find({
+    let query = Enrollment.find({
         student_id: studentId,
         status: "enrolled",
         academicYear: settings.currentAcademicYear, // Term boundary
         semester: settings.currentSemester, // Term boundary
     }).populate("course_id"); // Mapped as course_id acting as CourseOffering reference
+
+    if (session) {
+        query = query.session(session);
+    }
+
+    const activeEnrollments = await query;
 
     for (const active of activeEnrollments) {
         const activeOffering = active.course_id;
@@ -179,7 +190,7 @@ export const enrollStudent = catchAsync(async (req, res, next) => {
         return next(
             new AppError(
                 "Registrar has disabled the global enrollment window.",
-                403,
+                400,
             ),
         );
     }
@@ -187,7 +198,7 @@ export const enrollStudent = catchAsync(async (req, res, next) => {
         return next(
             new AppError(
                 `Academic restriction applied on status: ${req.user.academicStatus}`,
-                403,
+                400,
             ),
         );
     }
@@ -197,9 +208,6 @@ export const enrollStudent = catchAsync(async (req, res, next) => {
         req.user._id,
         offering.course_id.prerequisites_ids,
     );
-
-    // Time Conflict Filter
-    await verifyTimeConflicts(req.user._id, offering, settings);
 
     // ─────────────────────────────────────────────────────────────────
     // MULTIDOC ACID TRANSACTION
@@ -258,6 +266,14 @@ export const enrollStudent = catchAsync(async (req, res, next) => {
                     400,
                 );
             }
+
+            // Time conflict check must run inside transaction to avoid same-student races.
+            await verifyTimeConflicts(
+                lockedUser._id,
+                offering,
+                settings,
+                session,
+            );
 
             // 3. **Gate 4: Atomic Capacity Controller**
             const atomicOfferingUpdate = await CourseOffering.findOneAndUpdate(
@@ -388,9 +404,6 @@ export const forceEnrollStudent = catchAsync(async (req, res, next) => {
 
     const settings = await Settings.getSettings();
 
-    // Check overlaps conditionally inside/outside. (Here, pre-computation bounds Time Validation)
-    await verifyTimeConflicts(student._id, offering, settings);
-
     const session = await mongoose.startSession();
     let newEnrollmentRes;
 
@@ -448,6 +461,14 @@ export const forceEnrollStudent = catchAsync(async (req, res, next) => {
             } else {
                 gatesBypassed.push("credit_limit");
             }
+
+            // Time conflict check must run inside transaction to benefit from retries.
+            await verifyTimeConflicts(
+                lockedStudent._id,
+                offering,
+                settings,
+                session,
+            );
 
             // Conditional Gate 4
             let capacityQuery = { _id: offering._id };
@@ -552,7 +573,7 @@ export const withdrawStudent = catchAsync(async (req, res, next) => {
             return next(
                 new AppError(
                     "Registrar term is closed. Official Add/Drop boundaries apply.",
-                    403,
+                    400,
                 ),
             );
         }
@@ -625,14 +646,19 @@ export const getMyEnrollments = catchAsync(async (req, res, next) => {
 
     sanitizeGradesPayload(rawEnrollments);
 
-    const total = await new APIFeatures(Enrollment.find(filter), req.query)
+    const totalResults = await new APIFeatures(
+        Enrollment.find(filter),
+        req.query,
+    )
         .filter()
-        .countTotal();
+        .countTotal(Enrollment, filter);
 
     res.status(200).json({
         status: "success",
         results: rawEnrollments.length,
-        total,
+        currentPage: features.page,
+        totalPages: Math.ceil(totalResults / features.limit),
+        totalResults,
         data: { enrollments: rawEnrollments },
     });
 });
@@ -652,14 +678,19 @@ export const getAllEnrollments = catchAsync(async (req, res, next) => {
         .paginate();
 
     const enrollments = await features.query.populate("student_id course_id");
-    const total = await new APIFeatures(Enrollment.find(baseQuery), req.query)
+    const totalResults = await new APIFeatures(
+        Enrollment.find(baseQuery),
+        req.query,
+    )
         .filter()
-        .countTotal();
+        .countTotal(Enrollment, baseQuery);
 
     res.status(200).json({
         status: "success",
         results: enrollments.length,
-        total,
+        currentPage: features.page,
+        totalPages: Math.ceil(totalResults / features.limit),
+        totalResults,
         data: { enrollments },
     });
 });
@@ -670,7 +701,10 @@ export const getAllEnrollments = catchAsync(async (req, res, next) => {
  *           Looks up localized exact mapping logically verified via systemic boundary validations.
  */
 export const getEnrollmentById = catchAsync(async (req, res, next) => {
-    const filter = buildOwnershipFilter(req.params.id, req.user);
+    const filter = {
+        ...buildOwnershipFilter(req.params.id, req.user),
+        ...req.scopeFilter,
+    };
 
     const enrollment = await Enrollment.findOne(filter).populate(
         "student_id course_id",
@@ -690,6 +724,34 @@ export const getEnrollmentById = catchAsync(async (req, res, next) => {
         return next(
             new AppError("Forbidden jurisdiction boundaries accessed.", 403),
         );
+    }
+
+    if (req.user.role === "doctor") {
+        const assigned = (enrollment.course_id?.doctors_ids || []).some(
+            (id) => id.toString() === req.user._id.toString(),
+        );
+        if (!assigned) {
+            return next(
+                new AppError(
+                    "Forbidden jurisdiction boundaries accessed.",
+                    403,
+                ),
+            );
+        }
+    }
+
+    if (req.user.role === "ta") {
+        const assigned = (enrollment.course_id?.tas_ids || []).some(
+            (id) => id.toString() === req.user._id.toString(),
+        );
+        if (!assigned) {
+            return next(
+                new AppError(
+                    "Forbidden jurisdiction boundaries accessed.",
+                    403,
+                ),
+            );
+        }
     }
 
     res.status(200).json({ status: "success", data: { enrollment } });

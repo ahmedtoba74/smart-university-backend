@@ -13,6 +13,7 @@ import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
 import CourseOffering from "../../../DB/models/courseOfferingModel.js";
 import CourseCatalog from "../../../DB/models/courseCatalogModel.js";
+import Location from "../../../DB/models/locationModel.js";
 import Settings from "../../../DB/models/settingsModel.js";
 import Enrollment from "../../../DB/models/enrollmentModel.js";
 import User from "../../../DB/models/userModel.js";
@@ -260,6 +261,28 @@ export const createOffering = catchAsync(async (req, res, next) => {
     await validateStaffRoles(filteredBody.doctors_ids, filteredBody.tas_ids);
 
     // 6. Universal Schedule Conflict Checker
+    if (filteredBody.schedule && filteredBody.schedule.length > 0) {
+        for (const slot of filteredBody.schedule) {
+            const location = await Location.findOne({ _id: slot.location });
+            if (!location) {
+                return next(
+                    new AppError(
+                        `Invalid location reference in schedule: ${slot.location}`,
+                        404,
+                    ),
+                );
+            }
+            if (location.status === "maintenance") {
+                return next(
+                    new AppError(
+                        `Location ${slot.location} is under maintenance and cannot be scheduled.`,
+                        400,
+                    ),
+                );
+            }
+        }
+    }
+
     await checkScheduleConflicts(
         filteredBody.schedule,
         filteredBody.doctors_ids,
@@ -436,7 +459,7 @@ export const getOfferingStudents = catchAsync(async (req, res, next) => {
     // 2. Fetch Active State Registrations
     const enrollments = await Enrollment.find({
         course_id: offering._id,
-        status: { $in: ["enrolled", "passed", "failed"] }, // Excludes completely "withdrawn" students
+        status: "enrolled",
     }).populate({
         path: "student_id",
         select: "name email photo nationalID",
@@ -553,17 +576,19 @@ export const getAllOfferings = catchAsync(async (req, res, next) => {
         .populate({ path: "course_id", select: "title code creditHours" })
         .populate({ path: "doctors_ids tas_ids", select: "name email photo" });
 
-    const total = await new APIFeatures(
+    const totalResults = await new APIFeatures(
         CourseOffering.find(baseQuery),
         req.query,
     )
         .filter()
-        .countTotal();
+        .countTotal(CourseOffering, baseQuery);
 
     res.status(200).json({
         status: "success",
         results: offerings.length,
-        total,
+        currentPage: features.page,
+        totalPages: Math.ceil(totalResults / features.limit),
+        totalResults,
         data: { offerings },
     });
 });
@@ -575,7 +600,12 @@ export const getOffering = catchAsync(async (req, res, next) => {
     if (!applyIsArchivedGuard(req, next)) return;
 
     const filter = buildOwnershipFilter(req.params.id, req.user);
-    const baseQuery = { ...filter, ...req.archivedFilter, ...req.staffFilter };
+    const baseQuery = {
+        ...filter,
+        ...req.scopeFilter,
+        ...req.archivedFilter,
+        ...req.staffFilter,
+    };
 
     const offering = await CourseOffering.findOne(baseQuery)
         .populate({ path: "course_id", select: "title code creditHours" })

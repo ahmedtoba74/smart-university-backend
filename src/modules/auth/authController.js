@@ -24,6 +24,17 @@ const signToken = (id) => {
 };
 
 /**
+ * Type-safe OTP expiry check for Mongoose documents.
+ * Avoids relying on instance-method typing in editor diagnostics.
+ * @param {Object} user
+ * @returns {boolean}
+ */
+const isOtpExpired = (user) => {
+    if (!user?.twoFactorExpires) return true;
+    return new Date(user.twoFactorExpires).getTime() < Date.now();
+};
+
+/**
  * Create and send a token as a cookie and in the response.
  * @function createSendToken
  * @param {Object} user - User object.
@@ -224,7 +235,7 @@ export const loginStepTwo = catchAsync(async (req, res, next) => {
     if (!user) return next(new AppError("Invalid email or OTP expired", 400));
 
     // Security Check: OTP Expiry
-    if (user.isTwoFactorExpired()) {
+    if (isOtpExpired(user)) {
         return next(
             new AppError(
                 "OTP has expired. Please login again to get a new code.",
@@ -371,7 +382,7 @@ export const confirmUpdatePassword = catchAsync(async (req, res, next) => {
         );
     }
 
-    if (user.isTwoFactorExpired()) {
+    if (isOtpExpired(user)) {
         return next(
             new AppError(
                 "OTP has expired. Please login again to get a new code.",
