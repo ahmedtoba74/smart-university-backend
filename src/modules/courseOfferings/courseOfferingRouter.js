@@ -67,29 +67,6 @@ router
         courseOfferingController.updateOffering,
     );
 
-// ─── DYNAMIC ROUTES (Management & Grading) ────────────────────────────
-
-router.patch(
-    "/:id/schedule",
-    restrictTo("universityAdmin", "collegeAdmin"),
-    attachCollegeScope,
-    courseOfferingController.updateOfferingSchedule,
-);
-
-router.patch(
-    "/:id/staff",
-    restrictTo("universityAdmin", "collegeAdmin"),
-    attachCollegeScope,
-    courseOfferingController.updateOfferingStaff,
-);
-
-router.patch(
-    "/:id/status",
-    restrictTo("universityAdmin", "collegeAdmin"),
-    attachCollegeScope,
-    courseOfferingController.updateOfferingStatus,
-);
-
 // Grading & Semester Work Endpoints (from Section 16)
 router.patch(
     "/:id/grades/semester-work",
@@ -131,6 +108,15 @@ router.get(
     attachCollegeScope,
     attachStaffScope,
     courseOfferingController.getOfferingStudents,
+);
+
+// GET /:id/students/:studentId for doctors/TAs to view a specific enrolled student
+router.get(
+    "/:id/students/:studentId",
+    restrictTo("universityAdmin", "collegeAdmin", "doctor", "ta"),
+    attachCollegeScope,
+    attachStaffScope,
+    courseOfferingController.getOfferingStudent,
 );
 
 export default router;

@@ -34,7 +34,13 @@ router.use(enforcePasswordChange);
 router
     .route("/")
     .get(
-        restrictTo("universityAdmin", "collegeAdmin", "doctor", "ta", "student"),
+        restrictTo(
+            "universityAdmin",
+            "collegeAdmin",
+            "doctor",
+            "ta",
+            "student",
+        ),
         attachCollegeScope,
         courseCatalogController.getAllCourses,
     )
@@ -53,7 +59,13 @@ router
 router
     .route("/:id")
     .get(
-        restrictTo("universityAdmin", "collegeAdmin", "doctor", "ta", "student"),
+        restrictTo(
+            "universityAdmin",
+            "collegeAdmin",
+            "doctor",
+            "ta",
+            "student",
+        ),
         attachCollegeScope,
         courseCatalogController.getCourse,
     )

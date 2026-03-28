@@ -40,11 +40,7 @@ router.post(
 );
 
 // GET /my - Student view own enrollments (Must precede /:id)
-router.get(
-    "/my",
-    restrictTo("student"),
-    enrollmentController.getMyEnrollments,
-);
+router.get("/my", restrictTo("student"), enrollmentController.getMyEnrollments);
 
 /**
  * ─── COLLECTION ROUTES ────────────────────────────────────────────────
@@ -60,10 +56,7 @@ router
         attachCollegeScope,
         enrollmentController.getAllEnrollments,
     )
-    .post(
-        restrictTo("student"),
-        enrollmentController.enrollStudent,
-    );
+    .post(restrictTo("student"), enrollmentController.enrollStudent);
 
 /**
  * ─── DYNAMIC ROUTES ───────────────────────────────────────────────────
@@ -75,14 +68,20 @@ router
 router
     .route("/:id")
     .get(
-        restrictTo("universityAdmin", "collegeAdmin", "doctor", "ta", "student"),
+        restrictTo(
+            "universityAdmin",
+            "collegeAdmin",
+            "doctor",
+            "ta",
+            "student",
+        ),
         attachCollegeScope,
         enrollmentController.getEnrollmentById,
     );
 
 router.patch(
     "/:id/withdraw",
-    restrictTo("universityAdmin", "collegeAdmin", "student"),
+    restrictTo("universityAdmin", "universityAdmin", "student"),
     attachCollegeScope,
     enrollmentController.withdrawStudent,
 );

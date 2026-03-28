@@ -193,7 +193,6 @@ courseOfferingSchema.pre("validate", function (next) {
             }
         }
     }
-    next();
 });
 
 /**
@@ -217,7 +216,6 @@ courseOfferingSchema.pre("save", function (next) {
             );
         }
     }
-    next();
 });
 
 // ===========================================

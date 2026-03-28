@@ -134,6 +134,7 @@ const validateStaffRoles = async (doctorsIds, tasIds) => {
 const checkScheduleConflicts = async (
     schedule,
     doctorsIds,
+    tasIds,
     semester,
     academicYear,
     excludeOfferingId = null,
@@ -144,7 +145,7 @@ const checkScheduleConflicts = async (
     if (excludeOfferingId) baseQuery._id = { $ne: excludeOfferingId };
 
     const activeOfferings = await CourseOffering.find(baseQuery).select(
-        "schedule doctors_ids",
+        "schedule doctors_ids tas_ids",
     );
 
     for (const newSlot of schedule) {
@@ -174,12 +175,36 @@ const checkScheduleConflicts = async (
                         doctorsIds.length > 0 &&
                         existingOffering.doctors_ids
                     ) {
+                        const existingDoctorsStrings =
+                            existingOffering.doctors_ids.map((id) =>
+                                id.toString(),
+                            );
                         const overlappingDoctors = doctorsIds.filter((docId) =>
-                            existingOffering.doctors_ids.includes(docId),
+                            existingDoctorsStrings.includes(docId.toString()),
                         );
                         if (overlappingDoctors.length > 0) {
                             throw new AppError(
                                 `Doctor schedule conflict: One or more assigned doctors are already scheduled to teach heavily overlapping sessions on ${newSlot.day}.`,
+                                400,
+                            );
+                        }
+                    }
+
+                    // Block 3: Human Resource (TA) Collision
+                    if (
+                        tasIds &&
+                        tasIds.length > 0 &&
+                        existingOffering.tas_ids
+                    ) {
+                        const existingTAsStrings = existingOffering.tas_ids.map(
+                            (id) => id.toString(),
+                        );
+                        const overlappingTAs = tasIds.filter((taId) =>
+                            existingTAsStrings.includes(taId.toString()),
+                        );
+                        if (overlappingTAs.length > 0) {
+                            throw new AppError(
+                                `TA schedule conflict: One or more assigned TAs are already scheduled to teach heavily overlapping sessions on ${newSlot.day}.`,
                                 400,
                             );
                         }
@@ -286,6 +311,7 @@ export const createOffering = catchAsync(async (req, res, next) => {
     await checkScheduleConflicts(
         filteredBody.schedule,
         filteredBody.doctors_ids,
+        filteredBody.tas_ids,
         filteredBody.semester,
         filteredBody.academicYear,
     );
@@ -375,9 +401,11 @@ export const updateOffering = catchAsync(async (req, res, next) => {
     if (filteredBody.schedule) {
         // Prioritize incoming payload doctors, fallback to pre-existing state payload
         const checkDoctors = filteredBody.doctors_ids || offering.doctors_ids;
+        const checkTAs = filteredBody.tas_ids || offering.tas_ids;
         await checkScheduleConflicts(
             filteredBody.schedule,
             checkDoctors,
+            checkTAs,
             offering.semester,
             offering.academicYear,
             offering._id, // Critical: Exclude its own history
@@ -456,19 +484,89 @@ export const getOfferingStudents = catchAsync(async (req, res, next) => {
         );
     }
 
-    // 2. Fetch Active State Registrations
-    const enrollments = await Enrollment.find({
+    // 2. Fetch Active State Registrations with Pagination
+    const baseQuery = {
         course_id: offering._id,
+        status: "enrolled",
+    };
+
+    const features = new APIFeatures(Enrollment.find(baseQuery), req.query)
+        .filter()
+        .sort()
+        .limitFields()
+        .paginate();
+
+    const enrollments = await features.query.populate({
+        path: "student_id",
+        select: "name email photo nationalID",
+    });
+
+    const totalResults = await new APIFeatures(
+        Enrollment.find(baseQuery),
+        req.query,
+    )
+        .filter()
+        .countTotal(Enrollment, baseQuery);
+
+    res.status(200).json({
+        status: "success",
+        results: enrollments.length,
+        currentPage: features.page,
+        totalPages: Math.ceil(totalResults / features.limit),
+        totalResults,
+        data: { enrollments },
+    });
+});
+
+/**
+ * GET /api/v1/course-offerings/:id/students/:studentId
+ *
+ * Dedicated visibility endpoint for a specific student's enrollment inside an offering.
+ */
+export const getOfferingStudent = catchAsync(async (req, res, next) => {
+    // 1. Ownership & Scope Validation ensuring visibility bounds
+    const filter = buildOwnershipFilter(
+        req.params.id,
+        req.user,
+        "college_id",
+        "_id",
+    );
+
+    // Explicit Staff Filtration (e.g., { doctors_ids: req.user._id }) generated from authMiddleware logic
+    const mergedQuery = { ...filter, ...req.staffFilter };
+    const offering = await CourseOffering.findOne(mergedQuery);
+
+    if (!offering) {
+        return next(
+            new AppError(
+                "Offering not found, restricted due to hierarchy separation, or you are not an assigned teaching agent for this course.",
+                404,
+            ),
+        );
+    }
+
+    // 2. Fetch Active State Registration for the specific student
+    const enrollment = await Enrollment.findOne({
+        course_id: offering._id,
+        student_id: req.params.studentId,
         status: "enrolled",
     }).populate({
         path: "student_id",
         select: "name email photo nationalID",
     });
 
+    if (!enrollment) {
+        return next(
+            new AppError(
+                "Student is not actively enrolled in this offering.",
+                404,
+            ),
+        );
+    }
+
     res.status(200).json({
         status: "success",
-        results: enrollments.length,
-        data: { enrollments },
+        data: { enrollment },
     });
 });
 
@@ -574,7 +672,9 @@ export const getAllOfferings = catchAsync(async (req, res, next) => {
 
     const offerings = await features.query
         .populate({ path: "course_id", select: "title code creditHours" })
-        .populate({ path: "doctors_ids tas_ids", select: "name email photo" });
+        .populate({ path: "doctors_ids tas_ids", select: "name email photo" })
+        .populate({ path: "department_id", select: "name" })
+        .populate({ path: "college_id", select: "name" });
 
     const totalResults = await new APIFeatures(
         CourseOffering.find(baseQuery),
@@ -609,7 +709,10 @@ export const getOffering = catchAsync(async (req, res, next) => {
 
     const offering = await CourseOffering.findOne(baseQuery)
         .populate({ path: "course_id", select: "title code creditHours" })
-        .populate({ path: "doctors_ids tas_ids", select: "name email photo" });
+        .populate({ path: "doctors_ids tas_ids", select: "name email photo" })
+        .populate({ path: "department_id", select: "name" })
+        .populate({ path: "college_id", select: "name" })
+        .populate({ path: "schedule.location", select: "name" });
 
     if (!offering)
         return next(
@@ -626,24 +729,6 @@ export const getOffering = catchAsync(async (req, res, next) => {
 });
 
 // ============================================
-// STUBS FOR ROUTER ALIGNMENT (from earlier plan)
-// ============================================
-
-export const updateOfferingSchedule = catchAsync(async (req, res, next) => {
-    res.status(501).json({
-        message: "Not Implemented - Use generalized PATCH /:id",
-    });
-});
-export const updateOfferingStaff = catchAsync(async (req, res, next) => {
-    res.status(501).json({
-        message: "Not Implemented - Use generalized PATCH /:id",
-    });
-});
-export const updateOfferingStatus = catchAsync(async (req, res, next) => {
-    res.status(501).json({
-        message: "Not Implemented - Use generalized PATCH /:id",
-    });
-});
 
 export const submitSemesterWork = catchAsync(async (req, res, next) => {
     res.status(501).json({ message: "Pending Future Section 16 Build." });
