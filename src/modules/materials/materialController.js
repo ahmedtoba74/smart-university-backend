@@ -38,13 +38,11 @@ import {
  * @returns {Object} 201 - { status: 'success', data: { material } }
  * @throws  {AppError} 404 - Course offering not found
  */
-import { uploadToCloudinary } from "../../utils/uploadHelper.js"; // تأكد من المسار
 
 export const createMaterial = catchAsync(async (req, res, next) => {
     const { offeringId } = req.params;
     let { title, description, category, isExternalLink, url } = req.body;
 
-    // تحويل القيمة لـ Boolean في حالة وصولها كـ String من الـ FormData
     isExternalLink = isExternalLink === "true" || isExternalLink === true;
 
     const offering = await CourseOffering.findOne({

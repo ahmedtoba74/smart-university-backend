@@ -13,7 +13,7 @@ import {
     protect,
     restrictTo,
     attachCollegeScope,
-} from "../../middleware/authMiddleware.js";
+} from "../../middlewares/authMiddleware.js";
 import * as submissionController from "./submissionController.js";
 
 /**

@@ -8,6 +8,10 @@ import {
 } from "../../middlewares/authMiddleware.js";
 import { enforcePasswordChange } from "../../middlewares/enforcePasswordChange.js";
 
+// Phase 4 LMS Nested Routers
+import materialRouter from "../materials/materialRouter.js";
+import assessmentRouter from "../assessments/assessmentRouter.js";
+
 const router = express.Router({ mergeParams: true });
 
 // ─── Nested Route Interceptor ─────────────────────────────────────────
@@ -118,5 +122,10 @@ router.get(
     attachStaffScope,
     courseOfferingController.getOfferingStudent,
 );
+
+// ─── LMS NESTED ROUTERS (Phase 4) ─────────────────────────────────────
+// Mount materials and assessments under the specific offering context
+router.use("/:offeringId/materials", materialRouter);
+router.use("/:offeringId/assessments", assessmentRouter);
 
 export default router;

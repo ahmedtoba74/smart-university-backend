@@ -51,6 +51,9 @@ import locationRouter from "./src/modules/locations/locationRouter.js";
 import courseCatalogRouter from "./src/modules/courseCatalog/courseCatalogRouter.js";
 import courseOfferingRouter from "./src/modules/courseOfferings/courseOfferingRouter.js";
 import enrollmentRouter from "./src/modules/enrollments/enrollmentRouter.js";
+import submissionRouter from "./src/modules/submissions/submissionRouter.js";
+import gradebookRouter from "./src/modules/gradebooks/gradebookRouter.js";
+import uploadRouter from "./src/modules/uploads/uploadRouter.js";
 
 // Load env vars
 dotenv.config();
@@ -224,6 +227,11 @@ app.use("/api/v1/locations", locationRouter);
 app.use("/api/v1/course-catalog", courseCatalogRouter);
 app.use("/api/v1/course-offerings", courseOfferingRouter);
 app.use("/api/v1/enrollments", enrollmentRouter);
+
+// Phase 4 — LMS Core, Gradebook, & Decoupled Media Uploads
+app.use("/api/v1/submissions", submissionRouter);
+app.use("/api/v1/gradebook", gradebookRouter);
+app.use("/api/v1/uploads", uploadRouter);
 
 // Handle Unhandled Routes
 app.all(/(.*)/, (req, res, next) => {

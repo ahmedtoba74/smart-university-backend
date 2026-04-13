@@ -1,6 +1,6 @@
-import Settings from '../../../DB/models/settingsModel.js';
-import catchAsync from '../../utils/catchAsync.js';
-import AppError from '../../utils/appError.js';
+import Settings from "../../../DB/models/settingsModel.js";
+import catchAsync from "../../utils/catchAsync.js";
+import AppError from "../../utils/appError.js";
 
 // ============================================
 // IN-MEMORY SETTINGS CACHE
@@ -43,11 +43,13 @@ export const invalidateSettingsCache = () => {
 // ============================================
 
 const ALLOWED_UPDATE_FIELDS = [
-    'currentAcademicYear',
-    'currentSemester',
-    'isEnrollmentOpen',
-    'gradePoints',
-    'defaultCreditLimit'
+    "currentAcademicYear",
+    "currentSemester",
+    "isEnrollmentOpen",
+    "gradePoints",
+    "defaultCreditLimit",
+    "gradeThresholds",
+    "levelThresholds",
 ];
 
 /**
@@ -60,8 +62,8 @@ export const getSettings = catchAsync(async (req, res, next) => {
     const settings = await getSettingsCache();
 
     res.status(200).json({
-        status: 'success',
-        data: { settings }
+        status: "success",
+        data: { settings },
     });
 });
 
@@ -87,7 +89,7 @@ export const updateSettings = catchAsync(async (req, res, next) => {
     invalidateSettingsCache();
 
     res.status(200).json({
-        status: 'success',
-        data: { settings }
+        status: "success",
+        data: { settings },
     });
 });

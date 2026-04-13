@@ -410,7 +410,6 @@ assessmentSchema.pre(
         if (this.getQuery().isArchived === undefined) {
             this.where({ isArchived: false });
         }
-        next();
     },
 );
 
@@ -437,7 +436,6 @@ assessmentSchema.pre("save", function (next) {
             return sum + (question.points || 0);
         }, 0);
     }
-    next();
 });
 
 // ===========================================

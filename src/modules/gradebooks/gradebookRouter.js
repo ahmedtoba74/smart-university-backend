@@ -14,7 +14,7 @@ import {
     restrictTo,
     attachCollegeScope,
     attachStaffScope,
-} from "../../middleware/authMiddleware.js";
+} from "../../middlewares/authMiddleware.js";
 import * as gradebookController from "./gradebookController.js";
 
 /**
@@ -111,9 +111,8 @@ router.post(
 router.post(
     "/course/:offeringId/unlock-semester-work",
     protect,
-    restrictTo("doctor"),
+    restrictTo("universityAdmin"),
     attachCollegeScope,
-    attachStaffScope,
     gradebookController.unlockSemesterWork,
 );
 

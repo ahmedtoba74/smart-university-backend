@@ -16,6 +16,7 @@ import Enrollment from "../../../DB/models/enrollmentModel.js";
 import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
 import { recalculateAssignmentGrade } from "../../utils/gradeUtils.js";
+import { deleteFromCloudinary } from "../../utils/uploadHelper.js";
 
 /**
  * Save or update student answers (draft mode)
@@ -92,6 +93,21 @@ export const saveAnswers = catchAsync(async (req, res, next) => {
             await autoGradeSubmission(submission, assessment);
             await submission.save();
 
+            // Push objective scores to central Gradebook
+            if (submission.status === "graded") {
+                const assignmentGrade = await recalculateAssignmentGrade(
+                    submission.student_id,
+                    submission.courseOffering_id,
+                );
+                await Enrollment.findOneAndUpdate(
+                    {
+                        student_id: submission.student_id,
+                        course_id: submission.courseOffering_id,
+                    },
+                    { "grades.assignments": assignmentGrade },
+                );
+            }
+
             return res.status(200).json({
                 status: "success",
                 data: { submission },
@@ -109,9 +125,23 @@ export const saveAnswers = catchAsync(async (req, res, next) => {
             );
 
             if (existingIndex >= 0) {
+                // Orphan File Leak Prevention: Delete old file if overwritten or cleared
+                const oldAnswer = submission.answers[existingIndex];
+                if (
+                    oldAnswer.fileUrl &&
+                    newAnswer.fileUrl !== undefined &&
+                    newAnswer.fileUrl !== oldAnswer.fileUrl
+                ) {
+                    deleteFromCloudinary(oldAnswer.fileUrl).catch((err) => {
+                        console.warn(
+                            `[WARNING] Failed to clean up overwritten submission file: ${oldAnswer.fileUrl}`,
+                        );
+                    });
+                }
+
                 // Update existing answer
                 submission.answers[existingIndex] = {
-                    ...submission.answers[existingIndex].toObject(),
+                    ...oldAnswer.toObject(),
                     ...newAnswer,
                 };
             } else {
@@ -200,6 +230,21 @@ export const submitAssessment = catchAsync(async (req, res, next) => {
             await autoGradeSubmission(submission, assessment);
             await submission.save();
 
+            // Push objective scores to central Gradebook
+            if (submission.status === "graded") {
+                const assignmentGrade = await recalculateAssignmentGrade(
+                    submission.student_id,
+                    submission.courseOffering_id,
+                );
+                await Enrollment.findOneAndUpdate(
+                    {
+                        student_id: submission.student_id,
+                        course_id: submission.courseOffering_id,
+                    },
+                    { "grades.assignments": assignmentGrade },
+                );
+            }
+
             return res.status(200).json({
                 status: "success",
                 data: { submission },
@@ -216,6 +261,21 @@ export const submitAssessment = catchAsync(async (req, res, next) => {
     await autoGradeSubmission(submission, assessment);
 
     await submission.save();
+
+    // Push objective scores to central Gradebook
+    if (submission.status === "graded") {
+        const assignmentGrade = await recalculateAssignmentGrade(
+            submission.student_id,
+            submission.courseOffering_id,
+        );
+        await Enrollment.findOneAndUpdate(
+            {
+                student_id: submission.student_id,
+                course_id: submission.courseOffering_id,
+            },
+            { "grades.assignments": assignmentGrade },
+        );
+    }
 
     res.status(200).json({
         status: "success",

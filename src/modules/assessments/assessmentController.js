@@ -18,6 +18,7 @@ import Enrollment from "../../../DB/models/enrollmentModel.js";
 import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
 import { seededShuffle } from "../../utils/shuffleUtils.js";
+import { deleteFromCloudinary } from "../../utils/uploadHelper.js";
 
 /**
  * Create a new assessment
@@ -49,7 +50,28 @@ export const createAssessment = catchAsync(async (req, res, next) => {
         timeLimitMinutes,
         questions,
         settings,
+        doctorDeclaredTotal,
     } = req.body;
+
+    // D-3 Guard: Mathematical Total Constraint Validation
+    if (
+        questions &&
+        questions.length > 0 &&
+        doctorDeclaredTotal !== undefined
+    ) {
+        const calculatedTotal = questions.reduce(
+            (sum, q) => sum + (q.points || 0),
+            0,
+        );
+        if (doctorDeclaredTotal !== calculatedTotal) {
+            return next(
+                new AppError(
+                    `Total points mismatch: declared ${doctorDeclaredTotal}, calculated ${calculatedTotal}.`,
+                    400,
+                ),
+            );
+        }
+    }
 
     // Step 1: Verify course offering exists
     const offering = await CourseOffering.findOne({
@@ -198,6 +220,7 @@ export const updateAssessment = catchAsync(async (req, res, next) => {
         timeLimitMinutes,
         questions,
         settings,
+        doctorDeclaredTotal,
     } = req.body;
 
     // Step 1: Fetch assessment (findById for save() pattern)
@@ -276,15 +299,41 @@ export const updateAssessment = catchAsync(async (req, res, next) => {
         }
     }
 
-    // Step 2: Mutate document fields
+    // Step 2: Extract current attachments to prevent Orphaned File Leaks
+    let orphanedAttachments = [];
+    if (questions !== undefined) {
+        const oldAttachments = assessment.questions.flatMap(
+            (q) => q.attachments || [],
+        );
+        const newAttachments = questions.flatMap((q) => q.attachments || []);
+
+        // Find attachments present in old array but missing in new (orphaned)
+        orphanedAttachments = oldAttachments.filter(
+            (oldUrl) => !newAttachments.includes(oldUrl),
+        );
+
+        assessment.questions = questions;
+    }
+
+    // Mutate remaining document fields
     if (title !== undefined) assessment.title = title;
     if (description !== undefined) assessment.description = description;
     if (dueDate !== undefined) assessment.dueDate = dueDate;
     if (timeLimitMinutes !== undefined)
         assessment.timeLimitMinutes = timeLimitMinutes;
-    if (questions !== undefined) assessment.questions = questions;
     if (settings !== undefined)
         assessment.settings = { ...assessment.settings, ...settings };
+
+    // Fire & Forget Cloudinary deletions for orphaned attachments
+    if (orphanedAttachments.length > 0) {
+        orphanedAttachments.forEach((url) => {
+            deleteFromCloudinary(url).catch((err) => {
+                console.warn(
+                    `[WARNING] Failed to delete orphaned assessment attachment: ${url}`,
+                );
+            });
+        });
+    }
 
     // Step 3: Save (triggers pre-save hook to recalculate totalPoints)
     await assessment.save();

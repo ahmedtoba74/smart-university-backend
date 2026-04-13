@@ -14,7 +14,7 @@ import {
     restrictTo,
     attachStaffScope,
     attachCollegeScope,
-} from "../../middleware/authMiddleware.js";
+} from "../../middlewares/authMiddleware.js";
 import { uploadMix } from "../../middlewares/uploadMiddleware.js";
 import * as materialController from "./materialController.js";
 

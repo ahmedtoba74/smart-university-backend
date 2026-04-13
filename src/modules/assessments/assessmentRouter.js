@@ -14,8 +14,7 @@ import {
     restrictTo,
     attachStaffScope,
     attachCollegeScope,
-} from "../../middleware/authMiddleware.js";
-import { uploadMix } from "../../middlewares/uploadMiddleware.js";
+} from "../../middlewares/authMiddleware.js";
 import * as assessmentController from "./assessmentController.js";
 
 /**
@@ -63,6 +62,7 @@ router.get(
     "/",
     protect,
     restrictTo("doctor", "ta", "student", "collegeAdmin"),
+    attachCollegeScope,
     assessmentController.getAllAssessments,
 );
 
@@ -76,6 +76,7 @@ router.get(
     "/:id",
     protect,
     restrictTo("doctor", "ta", "student", "collegeAdmin"),
+    attachCollegeScope,
     assessmentController.getAssessment,
 );
 
@@ -126,6 +127,7 @@ router.get(
     "/:id/start",
     protect,
     restrictTo("student"),
+    attachCollegeScope,
     assessmentController.startAssessment,
 );
 

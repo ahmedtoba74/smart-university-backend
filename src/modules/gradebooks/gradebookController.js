@@ -100,11 +100,14 @@ export const getStudentGradebook = catchAsync(async (req, res, next) => {
         );
     }
 
+    // IDOR Restrict Cross-College Viewing
+    const query = { student_id: studentId, status: { $ne: "withdrawn" } };
+    if (req.user.role !== "student" && req.user.role !== "universityAdmin") {
+        query.college_id = req.scopeFilter.college_id;
+    }
+
     // Fetch all enrollments
-    const enrollments = await Enrollment.find({
-        student_id: studentId,
-        status: { $ne: "withdrawn" },
-    })
+    const enrollments = await Enrollment.find(query)
         .populate("course_id", "resultsPublished")
         .populate({
             path: "course_id",
@@ -374,11 +377,18 @@ export const lockSemesterWork = catchAsync(async (req, res, next) => {
             await submission.save();
             ghostCount++;
 
-            // If fully graded, recalculate assignment grade
+            // If fully graded, recalculate assignment grade and save to Enrollment
             if (submission.status === "graded") {
-                await recalculateAssignmentGrade(
+                const assignmentGrade = await recalculateAssignmentGrade(
                     submission.student_id,
                     offeringId,
+                );
+                await Enrollment.findOneAndUpdate(
+                    {
+                        student_id: submission.student_id,
+                        course_id: offeringId,
+                    },
+                    { "grades.assignments": assignmentGrade },
                 );
             }
         }
@@ -509,22 +519,12 @@ export const unlockSemesterWork = catchAsync(async (req, res, next) => {
         return next(new AppError("Course offering not found.", 404));
     }
 
-    // Step 2: Doctor authorization
-    if (!offering.doctors_ids.includes(req.user._id)) {
-        return next(
-            new AppError(
-                "You do not have permission to perform this action.",
-                403,
-            ),
-        );
-    }
-
-    // Step 3: Already unlocked guard
+    // Step 2: Already unlocked guard
     if (!offering.semesterWorkLocked) {
         return next(new AppError("Semester work is not locked.", 400));
     }
 
-    // Step 4: Publish guard (hard block)
+    // Step 3: Publish guard (hard block)
     if (offering.resultsPublished) {
         return next(
             new AppError(
@@ -534,7 +534,9 @@ export const unlockSemesterWork = catchAsync(async (req, res, next) => {
         );
     }
 
-    // Step 5: Unlock
+    // TODO: Audit Log - Record that the university admin unlocked the grades
+    // Example: await AuditLog.create({ actor_id: req.user._id, action: 'GRADEBOOK_UNLOCK', targetId: offeringId });
+    // Step 4: Unlock
     offering.semesterWorkLocked = false;
     await offering.save();
 
