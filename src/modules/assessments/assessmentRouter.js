@@ -20,7 +20,7 @@ import * as assessmentController from "./assessmentController.js";
 /**
  * Assessment Router
  *
- * Base path: /api/v1/offerings/:offeringId/assessments
+ * Base path: /api/v1/course-offerings/:offeringId/assessments
  * Handles CRUD operations for assessments and student access workflows
  *
  * Route Parameters:
@@ -38,7 +38,7 @@ const router = express.Router({ mergeParams: true });
 // ===========================================
 
 /**
- * @route   POST /api/v1/offerings/:offeringId/assessments
+ * @route   POST /api/v1/course-offerings/:offeringId/assessments
  * @desc    Create a new assessment
  * @access  Doctors & TAs (must be assigned to course)
  * @body    { title, description, dueDate, timeLimitMinutes?, questions[], settings? }
@@ -46,14 +46,13 @@ const router = express.Router({ mergeParams: true });
 router.post(
     "/",
     protect,
-    restrictTo("doctor", "ta"),
-    attachStaffScope,
+    restrictTo("doctor"),
     attachCollegeScope,
     assessmentController.createAssessment,
 );
 
 /**
- * @route   GET /api/v1/offerings/:offeringId/assessments
+ * @route   GET /api/v1/course-offerings/:offeringId/assessments
  * @desc    Get all assessments for a course offering
  * @access  Doctors, TAs, Students (enrolled), College Admins
  * @note    Students see limited fields (no isCorrect, modelAnswer)
@@ -67,7 +66,7 @@ router.get(
 );
 
 /**
- * @route   GET /api/v1/offerings/:offeringId/assessments/:id
+ * @route   GET /api/v1/course-offerings/:offeringId/assessments/:id
  * @desc    Get a single assessment by ID (with question security)
  * @access  Doctors, TAs, Students (enrolled), College Admins
  * @note    Students cannot see isCorrect or modelAnswer fields
@@ -81,7 +80,7 @@ router.get(
 );
 
 /**
- * @route   PATCH /api/v1/offerings/:offeringId/assessments/:id
+ * @route   PATCH /api/v1/course-offerings/:offeringId/assessments/:id
  * @desc    Update an assessment (questions, settings, metadata)
  * @access  Doctors & TAs (must be assigned to course)
  * @body    { title?, description?, dueDate?, timeLimitMinutes?, questions?, settings? }
@@ -91,14 +90,13 @@ router.get(
 router.patch(
     "/:id",
     protect,
-    restrictTo("doctor", "ta"),
-    attachStaffScope,
+    restrictTo("doctor"),
     attachCollegeScope,
     assessmentController.updateAssessment,
 );
 
 /**
- * @route   DELETE /api/v1/offerings/:offeringId/assessments/:id
+ * @route   DELETE /api/v1/course-offerings/:offeringId/assessments/:id
  * @desc    Soft-delete an assessment (set isArchived = true)
  * @access  Doctors & TAs (must be assigned to course)
  * @note    Archived assessments auto-filtered by pre-find hook
@@ -106,8 +104,7 @@ router.patch(
 router.delete(
     "/:id",
     protect,
-    restrictTo("doctor", "ta"),
-    attachStaffScope,
+    restrictTo("doctor"),
     attachCollegeScope,
     assessmentController.deleteAssessment,
 );
@@ -117,7 +114,7 @@ router.delete(
 // ===========================================
 
 /**
- * @route   GET /api/v1/offerings/:offeringId/assessments/:id/start
+ * @route   GET /api/v1/course-offerings/:offeringId/assessments/:id/start
  * @desc    Start an assessment (creates submission with startedAt timestamp)
  * @access  Students (enrolled in course)
  * @returns Shuffled questions/options (if enabled), submission ID, timer deadline

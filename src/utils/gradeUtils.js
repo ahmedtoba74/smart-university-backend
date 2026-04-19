@@ -12,6 +12,7 @@
  */
 
 import Submission from "../../DB/models/submissionModel.js";
+import Enrollment from "../../DB/models/enrollmentModel.js";
 import mongoose from "mongoose";
 
 // Dynamically retrieve the model to prevent circular dependency issues
@@ -135,5 +136,13 @@ export const recalculateAssignmentGrade = async (studentId, offeringId) => {
     const rawScore = result[0]?.rawScore ?? 0;
 
     // 3. Apply ceiling cap (Math.min) - No percentage ratios (Decision D-8)
-    return Math.min(rawScore, assignmentMax);
+    const assignmentGrade = Math.min(rawScore, assignmentMax);
+
+    // 4. Write directly to enrollment (Plan Section 15, CRIT-5)
+    await Enrollment.findOneAndUpdate(
+        { student_id: studentId, course_id: offeringId, status: "enrolled" },
+        { $set: { "grades.assignments": assignmentGrade } },
+    );
+
+    return assignmentGrade;
 };

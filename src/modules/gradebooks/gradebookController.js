@@ -377,18 +377,11 @@ export const lockSemesterWork = catchAsync(async (req, res, next) => {
             await submission.save();
             ghostCount++;
 
-            // If fully graded, recalculate assignment grade and save to Enrollment
+            // CRIT-5: recalculateAssignmentGrade writes to enrollment internally
             if (submission.status === "graded") {
-                const assignmentGrade = await recalculateAssignmentGrade(
+                await recalculateAssignmentGrade(
                     submission.student_id,
                     offeringId,
-                );
-                await Enrollment.findOneAndUpdate(
-                    {
-                        student_id: submission.student_id,
-                        course_id: offeringId,
-                    },
-                    { "grades.assignments": assignmentGrade },
                 );
             }
         }
@@ -471,6 +464,14 @@ async function autoGradeGhostSubmission(submission, assessment) {
                 }
                 break;
 
+            // CRIT-4: Short-Answer, Paragraph, FileUpload require manual grading
+            case "Short-Answer":
+            case "Paragraph":
+            case "FileUpload":
+                score = 0;
+                answer.feedback = "Pending manual review";
+                break;
+
             default:
                 score = 0;
         }
@@ -534,8 +535,12 @@ export const unlockSemesterWork = catchAsync(async (req, res, next) => {
         );
     }
 
-    // TODO: Audit Log - Record that the university admin unlocked the grades
-    // Example: await AuditLog.create({ actor_id: req.user._id, action: 'GRADEBOOK_UNLOCK', targetId: offeringId });
+    // DEBT-4: Audit Log (D-27) - Record unlock event
+    console.warn(
+        `[AUDIT] Semester work UNLOCKED by ${req.user.role} (${req.user._id}) for offering ${offeringId}`,
+    );
+    // TODO: Replace with AuditLog.create() once the AuditLog model is implemented
+    // await AuditLog.create({ actor_id: req.user._id, action: 'GRADEBOOK_UNLOCK', targetId: offeringId });
     // Step 4: Unlock
     offering.semesterWorkLocked = false;
     await offering.save();
@@ -845,6 +850,165 @@ export const publishGradebook = catchAsync(async (req, res, next) => {
             published: enrollments.length,
             passed: passedCount,
             failed: failedCount,
+        },
+    });
+});
+
+/**
+ * Get student's own grades for a specific course offering
+ *
+ * Business Logic:
+ * 1. Verify student is enrolled in the offering
+ * 2. Return enrollment grades
+ * 3. Strip finalTotal/finalLetter if resultsPublished = false
+ *
+ * @route   GET /api/v1/gradebook/course/:offeringId/my
+ * @access  Students (enrolled in offering)
+ *
+ * @param   {Object} req.params.offeringId - Course offering ID
+ * @param   {Object} req.user - Authenticated student
+ *
+ * @returns {Object} 200 - { status: 'success', data: { enrollment } }
+ * @throws  {AppError} 404 - Course offering or enrollment not found
+ *
+ * @audit   CRIT-10: Missing endpoint from Plan Section 17
+ */
+export const getMyGrades = catchAsync(async (req, res, next) => {
+    const { offeringId } = req.params;
+    const studentId = req.user._id;
+
+    // Verify offering exists
+    const offering = await CourseOffering.findById(offeringId);
+    if (!offering) {
+        return next(new AppError("Course offering not found.", 404));
+    }
+
+    // Fetch student's enrollment
+    const enrollment = await Enrollment.findOne({
+        student_id: studentId,
+        course_id: offeringId,
+        status: { $ne: "withdrawn" },
+    });
+
+    if (!enrollment) {
+        return next(new AppError("You are not enrolled in this course.", 404));
+    }
+
+    // Strip final grades if results not published
+    const enrollmentObj = enrollment.toObject();
+    if (!offering.resultsPublished) {
+        delete enrollmentObj.grades.finalTotal;
+        delete enrollmentObj.grades.finalLetter;
+    }
+
+    res.status(200).json({
+        status: "success",
+        data: { enrollment: enrollmentObj },
+    });
+});
+
+/**
+ * Admin tool: Rebuild a student's GPA from scratch
+ *
+ * Business Logic:
+ * 1. Fetch ALL enrollments for the student (no college_id filter - D-26)
+ * 2. Absolute rebuild of earnedCredits, GPA, level, academicStatus
+ * 3. Write to User document
+ *
+ * This is the designated recovery tool for the concurrent publish
+ * race condition documented in D-25.
+ *
+ * @route   POST /api/v1/gradebook/admin/students/:studentId/rebuild-gpa
+ * @access  University Admin only
+ *
+ * @param   {Object} req.params.studentId - Student user ID
+ *
+ * @returns {Object} 200 - { status: 'success', data: { gpa, earnedCredits, level, academicStatus } }
+ * @throws  {AppError} 404 - Student not found
+ *
+ * @audit   D-25: Concurrent publish recovery tool
+ *          D-26: No college_id filter for cumulative GPA
+ */
+export const rebuildStudentGpa = catchAsync(async (req, res, next) => {
+    const { studentId } = req.params;
+
+    // Verify student exists
+    const student = await User.findById(studentId);
+    if (!student || student.role !== "student") {
+        return next(new AppError("Student not found.", 404));
+    }
+
+    // Fetch Settings
+    const settings = await Settings.getSettings();
+    const gradePoints = settings.gradePoints;
+    const levelThresholds = settings.levelThresholds;
+
+    // Fetch ALL enrollments (no college_id filter - D-26)
+    const allEnrollments = await Enrollment.find({
+        student_id: studentId,
+        status: { $in: ["passed", "failed"] },
+    }).select("status snapshot.creditHours grades.finalLetter");
+
+    // Absolute rebuild - earned credits
+    const earnedCredits = allEnrollments
+        .filter((e) => e.status === "passed")
+        .reduce((sum, e) => sum + (e.snapshot?.creditHours || 0), 0);
+
+    // Absolute rebuild - GPA
+    const gpaEnrollments = allEnrollments.filter(
+        (e) => e.grades.finalLetter && gradePoints.has(e.grades.finalLetter),
+    );
+
+    const totalWeighted = gpaEnrollments.reduce((sum, e) => {
+        const points = gradePoints.get(e.grades.finalLetter) || 0;
+        const credits = e.snapshot?.creditHours || 0;
+        return sum + points * credits;
+    }, 0);
+
+    const totalAttempted = gpaEnrollments.reduce(
+        (sum, e) => sum + (e.snapshot?.creditHours || 0),
+        0,
+    );
+
+    const gpa =
+        totalAttempted > 0
+            ? Math.round((totalWeighted / totalAttempted) * 100) / 100
+            : 0.0;
+
+    // Level promotion
+    const sortedLevels = Array.from(levelThresholds.entries()).sort(
+        (a, b) => b[1] - a[1],
+    );
+
+    const newLevel = Number(
+        sortedLevels.find(([, threshold]) => earnedCredits >= threshold)?.[0] ||
+            1,
+    );
+
+    // Academic status
+    let academicStatus = "good_standing";
+    if (gpa < 2.0) {
+        academicStatus = "probation";
+    } else if (gpa >= 3.5) {
+        academicStatus = "honors";
+    }
+
+    // Atomic write to User
+    await User.findByIdAndUpdate(studentId, {
+        gpa,
+        earnedCredits,
+        level: newLevel,
+        academicStatus,
+    });
+
+    res.status(200).json({
+        status: "success",
+        data: {
+            message: "Student GPA rebuilt successfully.",
+            gpa,
+            earnedCredits,
+            level: newLevel,
+            academicStatus,
         },
     });
 });

@@ -85,9 +85,13 @@ export const createMaterial = catchAsync(async (req, res, next) => {
             );
         }
 
+        const isRaw =
+            !file.mimetype.startsWith("image/") &&
+            !file.mimetype.startsWith("video/");
         const cloudinaryResult = await uploadToCloudinary(
             file.buffer,
             `materials/${offeringId}`,
+            isRaw,
         );
 
         finalUrl = cloudinaryResult.secure_url;
@@ -232,7 +236,7 @@ export const getMaterial = catchAsync(async (req, res, next) => {
  */
 export const updateMaterial = catchAsync(async (req, res, next) => {
     const { offeringId, id } = req.params;
-    const { title, description, category } = req.body;
+    let { title, description, category, isExternalLink, url } = req.body;
 
     // Step 1: Fetch material with tenant isolation
     const material = await Material.findOne({
@@ -253,10 +257,110 @@ export const updateMaterial = catchAsync(async (req, res, next) => {
         return next(new AppError("You can only edit your own materials.", 403));
     }
 
-    // Step 3: Update allowed fields
+    // Step 3: Update allowed metadata fields
     if (title !== undefined) material.title = title;
     if (description !== undefined) material.description = description;
     if (category !== undefined) material.category = category;
+
+    // Step 4: Handle File / URL Replacement
+    if (
+        isExternalLink !== undefined ||
+        req.files?.file?.[0] ||
+        url !== undefined
+    ) {
+        let newIsExternalLink = material.isExternalLink;
+        if (isExternalLink !== undefined) {
+            newIsExternalLink =
+                isExternalLink === "true" || isExternalLink === true;
+        }
+
+        if (newIsExternalLink) {
+            // Case A: Is/Becomes an External Link
+            let newUrl = url;
+            if (url === undefined) {
+                newUrl = material.isExternalLink ? material.url : undefined;
+            }
+            if (!newUrl) {
+                return next(
+                    new AppError("URL is required when switching to an external link.", 400),
+                );
+            }
+            if (material.category !== "Links") {
+                return next(
+                    new AppError(
+                        "Category must be 'Links' for external materials.",
+                        400,
+                    ),
+                );
+            }
+
+            // Cleanup old file from Cloudinary if switching from file -> link
+            if (!material.isExternalLink && material.url) {
+                try {
+                    await deleteFromCloudinary(material.url);
+                } catch (err) {
+                    console.warn(
+                        `[WARNING] Failed to delete old file from Cloudinary for material ${id}`,
+                    );
+                }
+            }
+
+            material.isExternalLink = true;
+            material.url = newUrl;
+            material.fileName = null;
+            material.fileType = null;
+        } else {
+            // Case B: Is/Becomes a File Upload
+            if (
+                !["Lectures", "Sheets", "Readings"].includes(material.category)
+            ) {
+                return next(
+                    new AppError(
+                        "Category must be 'Lectures', 'Sheets', or 'Readings'.",
+                        400,
+                    ),
+                );
+            }
+
+            const file = req.files?.file?.[0];
+
+            // If they provided a new file, we replace the old one
+            if (file) {
+                const isRaw =
+                    !file.mimetype.startsWith("image/") &&
+                    !file.mimetype.startsWith("video/");
+                const cloudinaryResult = await uploadToCloudinary(
+                    file.buffer,
+                    `materials/${offeringId}`,
+                    isRaw,
+                );
+
+                // Delete old file from Cloudinary (if there is one)
+                if (!material.isExternalLink && material.url) {
+                    try {
+                        await deleteFromCloudinary(material.url);
+                    } catch (err) {
+                        console.warn(
+                            `[WARNING] Failed to delete old file from Cloudinary for material ${id}`,
+                        );
+                    }
+                }
+
+                material.url = cloudinaryResult.secure_url;
+                material.fileName = file.originalname;
+                material.fileType = file.mimetype;
+                material.isExternalLink = false;
+            } else if (material.isExternalLink && newIsExternalLink === false) {
+                // They trying to switch from Link -> File without providing a file
+                return next(
+                    new AppError(
+                        "A file is required when switching to a non-link material.",
+                        400,
+                    ),
+                );
+            }
+        }
+    }
 
     await material.save();
 

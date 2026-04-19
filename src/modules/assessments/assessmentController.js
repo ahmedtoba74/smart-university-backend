@@ -53,26 +53,6 @@ export const createAssessment = catchAsync(async (req, res, next) => {
         doctorDeclaredTotal,
     } = req.body;
 
-    // D-3 Guard: Mathematical Total Constraint Validation
-    if (
-        questions &&
-        questions.length > 0 &&
-        doctorDeclaredTotal !== undefined
-    ) {
-        const calculatedTotal = questions.reduce(
-            (sum, q) => sum + (q.points || 0),
-            0,
-        );
-        if (doctorDeclaredTotal !== calculatedTotal) {
-            return next(
-                new AppError(
-                    `Total points mismatch: declared ${doctorDeclaredTotal}, calculated ${calculatedTotal}.`,
-                    400,
-                ),
-            );
-        }
-    }
-
     // Step 1: Verify course offering exists
     const offering = await CourseOffering.findOne({
         _id: offeringId,
@@ -81,6 +61,41 @@ export const createAssessment = catchAsync(async (req, res, next) => {
 
     if (!offering) {
         return next(new AppError("Course offering not found.", 404));
+    }
+
+    // CRIT-1: Doctor authorization — only assigned doctors can create (D-18)
+    if (!offering.doctors_ids.some((id) => id.toString() === req.user._id.toString())) {
+        return next(new AppError("You do not have permission to perform this action.", 403));
+    }
+
+    // CRIT-2: Question Validation (Plan Section 11, Step 4)
+    if (questions && questions.length > 0) {
+        for (const q of questions) {
+            if (["MCQ-Single", "MCQ-Multiple", "TrueFalse"].includes(q.questionType)) {
+                if (!q.options || q.options.length === 0)
+                    return next(new AppError("Objective questions must have options.", 400));
+                if (!q.options.some((opt) => opt.isCorrect))
+                    return next(new AppError("Objective questions must have at least one correct option.", 400));
+            } else if (["Short-Answer", "Paragraph", "FileUpload"].includes(q.questionType)) {
+                if (q.options && q.options.length > 0)
+                    return next(new AppError("Subjective questions cannot have options.", 400));
+            }
+            if (!q.points || q.points <= 0)
+                return next(new AppError("Question points must be > 0.", 400));
+        }
+    }
+
+    // D-3 Guard: Mathematical Total Constraint Validation
+    if (questions && questions.length > 0 && doctorDeclaredTotal !== undefined) {
+        const calculatedTotal = questions.reduce((sum, q) => sum + (q.points || 0), 0);
+        if (doctorDeclaredTotal !== calculatedTotal) {
+            return next(
+                new AppError(
+                    `Total points mismatch: declared ${doctorDeclaredTotal}, calculated ${calculatedTotal}.`,
+                    400,
+                ),
+            );
+        }
     }
 
     // Step 2: Create assessment with denormalized college_id
@@ -443,8 +458,13 @@ export const startAssessment = catchAsync(async (req, res, next) => {
     // Step 2: Check if accepting responses
     if (!assessment.settings.acceptingResponses) {
         return next(
-            new AppError("Assessment is not accepting responses.", 403),
+            new AppError("This assessment is not accepting responses.", 400),
         );
+    }
+
+    // CRIT-6: dueDate guard (Plan Section 11, Step 2)
+    if (assessment.dueDate && new Date() > assessment.dueDate) {
+        return next(new AppError("The deadline for this assessment has passed.", 400));
     }
 
     // Step 3: Verify student is enrolled in course
@@ -476,6 +496,30 @@ export const startAssessment = catchAsync(async (req, res, next) => {
             status: "in_progress",
             answers: [],
         });
+    } else if (submission.status === "submitted" || submission.status === "graded") {
+        // Already-submitted guard (Plan Step 3)
+        return next(new AppError("You have already submitted this assessment.", 400));
+    }
+
+    // CRIT-6: Timer auto-submit on resume (Plan Step 4, D-5)
+    if (
+        submission.status === "in_progress" &&
+        assessment.timeLimitMinutes &&
+        submission.startedAt
+    ) {
+        const deadline = new Date(
+            submission.startedAt.getTime() + assessment.timeLimitMinutes * 60000,
+        );
+        if (new Date() > deadline) {
+            submission.status = "submitted";
+            submission.submittedAt = new Date();
+            await submission.save();
+            return res.status(200).json({
+                status: "success",
+                data: { submission },
+                autoSubmitted: true,
+            });
+        }
     }
 
     // Step 5: Apply shuffling (if enabled)

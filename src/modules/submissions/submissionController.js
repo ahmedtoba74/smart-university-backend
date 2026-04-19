@@ -13,6 +13,7 @@
 import Submission from "../../../DB/models/submissionModel.js";
 import Assessment from "../../../DB/models/assessmentModel.js";
 import Enrollment from "../../../DB/models/enrollmentModel.js";
+import CourseOffering from "../../../DB/models/courseOfferingModel.js";
 import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
 import { recalculateAssignmentGrade } from "../../utils/gradeUtils.js";
@@ -48,21 +49,15 @@ export const saveAnswers = catchAsync(async (req, res, next) => {
     const { answers } = req.body;
     const studentId = req.user._id;
 
-    // Step 1: Fetch submission with assessment data
+    // Step 1: Fetch submission with IDOR guard (CRIT-3: atomic student_id + college_id query)
     const submission = await Submission.findOne({
         _id: submissionId,
-        college_id: req.scopeFilter.college_id, // IDOR Guard
+        student_id: studentId,
+        college_id: req.scopeFilter.college_id,
     });
 
     if (!submission) {
         return next(new AppError("Submission not found.", 404));
-    }
-
-    // Step 2: Ownership check
-    if (submission.student_id.toString() !== studentId.toString()) {
-        return next(
-            new AppError("Not authorized to modify this submission.", 403),
-        );
     }
 
     // Step 3: Status check (can only save if in_progress)
@@ -75,6 +70,11 @@ export const saveAnswers = catchAsync(async (req, res, next) => {
         _id: submission.assessment_id,
         college_id: req.scopeFilter.college_id, // IDOR Guard
     });
+
+    // CRIT-7: dueDate guard (Plan Section 15, Step 4)
+    if (assessment.dueDate && new Date() > assessment.dueDate) {
+        return next(new AppError("The deadline for this assessment has passed.", 400));
+    }
 
     if (assessment.timeLimitMinutes && submission.startedAt) {
         const deadline = new Date(
@@ -93,18 +93,11 @@ export const saveAnswers = catchAsync(async (req, res, next) => {
             await autoGradeSubmission(submission, assessment);
             await submission.save();
 
-            // Push objective scores to central Gradebook
+            // CRIT-5: recalculateAssignmentGrade writes to enrollment internally
             if (submission.status === "graded") {
-                const assignmentGrade = await recalculateAssignmentGrade(
+                await recalculateAssignmentGrade(
                     submission.student_id,
                     submission.courseOffering_id,
-                );
-                await Enrollment.findOneAndUpdate(
-                    {
-                        student_id: submission.student_id,
-                        course_id: submission.courseOffering_id,
-                    },
-                    { "grades.assignments": assignmentGrade },
                 );
             }
 
@@ -186,24 +179,18 @@ export const submitAssessment = catchAsync(async (req, res, next) => {
     const { submissionId } = req.params;
     const studentId = req.user._id;
 
-    // Step 1: Fetch submission
+    // Step 1: Fetch submission (CRIT-3: atomic student_id + college_id query)
     const submission = await Submission.findOne({
         _id: submissionId,
-        college_id: req.scopeFilter.college_id, // IDOR Guard
+        student_id: studentId,
+        college_id: req.scopeFilter.college_id,
     });
 
     if (!submission) {
         return next(new AppError("Submission not found.", 404));
     }
 
-    // Step 2: Ownership check
-    if (submission.student_id.toString() !== studentId.toString()) {
-        return next(
-            new AppError("Not authorized to submit this assessment.", 403),
-        );
-    }
-
-    // Step 3: Status check
+    // Step 2: Status check
     if (submission.status !== "in_progress") {
         return next(new AppError("Submission already finalized.", 403));
     }
@@ -213,6 +200,11 @@ export const submitAssessment = catchAsync(async (req, res, next) => {
         _id: submission.assessment_id,
         college_id: req.scopeFilter.college_id, // IDOR Guard
     }).select("+questions.options.isCorrect"); // Include answer keys for grading
+
+    // CRIT-7: dueDate guard (Plan Section 15, Step 3-4)
+    if (assessment.dueDate && new Date() > assessment.dueDate) {
+        return next(new AppError("The deadline for this assessment has passed.", 400));
+    }
 
     // Step 5: Timer expiry check
     if (assessment.timeLimitMinutes && submission.startedAt) {
@@ -230,18 +222,11 @@ export const submitAssessment = catchAsync(async (req, res, next) => {
             await autoGradeSubmission(submission, assessment);
             await submission.save();
 
-            // Push objective scores to central Gradebook
+            // CRIT-5: recalculateAssignmentGrade writes to enrollment internally
             if (submission.status === "graded") {
-                const assignmentGrade = await recalculateAssignmentGrade(
+                await recalculateAssignmentGrade(
                     submission.student_id,
                     submission.courseOffering_id,
-                );
-                await Enrollment.findOneAndUpdate(
-                    {
-                        student_id: submission.student_id,
-                        course_id: submission.courseOffering_id,
-                    },
-                    { "grades.assignments": assignmentGrade },
                 );
             }
 
@@ -262,18 +247,11 @@ export const submitAssessment = catchAsync(async (req, res, next) => {
 
     await submission.save();
 
-    // Push objective scores to central Gradebook
+    // CRIT-5: recalculateAssignmentGrade writes to enrollment internally
     if (submission.status === "graded") {
-        const assignmentGrade = await recalculateAssignmentGrade(
+        await recalculateAssignmentGrade(
             submission.student_id,
             submission.courseOffering_id,
-        );
-        await Enrollment.findOneAndUpdate(
-            {
-                student_id: submission.student_id,
-                course_id: submission.courseOffering_id,
-            },
-            { "grades.assignments": assignmentGrade },
         );
     }
 
@@ -358,7 +336,14 @@ async function autoGradeSubmission(submission, assessment) {
                 }
                 break;
 
-            // Short-Answer, Paragraph, FileUpload require manual grading
+            // CRIT-4: Short-Answer, Paragraph, FileUpload require manual grading
+            case "Short-Answer":
+            case "Paragraph":
+            case "FileUpload":
+                score = 0;
+                answer.feedback = "Pending manual review";
+                break;
+
             default:
                 score = 0;
         }
@@ -405,7 +390,7 @@ export const getSubmission = catchAsync(async (req, res, next) => {
         _id: submissionId,
         college_id: req.scopeFilter.college_id, // IDOR Guard
     })
-        .populate("assessment_id", "title totalPoints")
+        .populate("assessment_id", "title totalPoints settings") // DEBT-5: include settings for showGradesImmediately
         .populate("student_id", "name email")
         .populate("gradedBy_id", "name email");
 
@@ -527,11 +512,41 @@ export const gradeSubmission = catchAsync(async (req, res, next) => {
         return next(new AppError("Submission not found.", 404));
     }
 
+    // CRIT-9: Status guard - only 'submitted' submissions can be graded
+    if (submission.status !== "submitted") {
+        return next(new AppError("Submission is not in a gradeable state.", 400));
+    }
+
+    // CRIT-8: Staff authorization check (D-16)
+    const offering = await CourseOffering.findById(submission.courseOffering_id);
+    if (req.user.role === "doctor" && !offering.doctors_ids.some((id) => id.toString() === req.user._id.toString())) {
+        return next(new AppError("You do not have permission to perform this action.", 403));
+    }
+    if (req.user.role === "ta" && !offering.tas_ids.some((id) => id.toString() === req.user._id.toString())) {
+        return next(new AppError("You do not have permission to perform this action.", 403));
+    }
+
     // Step 2: Fetch assessment to get question points
     const assessment = await Assessment.findOne({
         _id: submission.assessment_id,
         college_id: req.scopeFilter.college_id, // IDOR Guard
     });
+
+    // DEBT-2: Score range validation
+    if (answers && answers.length > 0) {
+        for (const gradingData of answers) {
+            if (gradingData.score === undefined || gradingData.score === null) {
+                return next(new AppError(`Score is required for question ${gradingData.questionId}.`, 400));
+            }
+            if (gradingData.score < 0) {
+                return next(new AppError("Score cannot be negative.", 400));
+            }
+            const question = assessment.questions.id(gradingData.questionId);
+            if (question && gradingData.score > question.points) {
+                return next(new AppError(`Score ${gradingData.score} exceeds maximum ${question.points}.`, 400));
+            }
+        }
+    }
 
     // Step 3: Update answer scores and feedback
     if (answers && answers.length > 0) {
@@ -543,8 +558,8 @@ export const gradeSubmission = catchAsync(async (req, res, next) => {
             );
 
             if (answerIndex >= 0) {
-                submission.answers[answerIndex].score = gradingData.score || 0;
-                if (gradingData.feedback) {
+                submission.answers[answerIndex].score = gradingData.score;
+                if (gradingData.feedback !== undefined) {
                     submission.answers[answerIndex].feedback =
                         gradingData.feedback;
                 }
@@ -571,18 +586,10 @@ export const gradeSubmission = catchAsync(async (req, res, next) => {
         submission.gradedBy_id = req.user._id;
         await submission.save();
 
-        // Step 6: Trigger assignment grade recalculation
-        const assignmentGrade = await recalculateAssignmentGrade(
+        // CRIT-5: recalculateAssignmentGrade writes to enrollment internally
+        await recalculateAssignmentGrade(
             submission.student_id,
             submission.courseOffering_id,
-        );
-
-        await Enrollment.findOneAndUpdate(
-            {
-                student_id: submission.student_id,
-                course_id: submission.courseOffering_id,
-            },
-            { "grades.assignments": assignmentGrade },
         );
     } else {
         await submission.save();

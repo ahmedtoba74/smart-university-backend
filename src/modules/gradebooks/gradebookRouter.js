@@ -117,6 +117,24 @@ router.post(
 );
 
 // ===========================================
+// STUDENT SELF-VIEW ROUTES
+// ===========================================
+
+/**
+ * @route   GET /api/v1/gradebook/course/:offeringId/my
+ * @desc    Get authenticated student's own grades for a course offering
+ * @access  Students (enrolled in offering)
+ * @returns Enrollment with grade components (finalTotal/finalLetter stripped if not published)
+ * @audit   CRIT-10: Missing endpoint from Plan Section 17
+ */
+router.get(
+    "/course/:offeringId/my",
+    protect,
+    restrictTo("student"),
+    gradebookController.getMyGrades,
+);
+
+// ===========================================
 // FINAL EXAM ENTRY ROUTES (College Admins)
 // ===========================================
 
@@ -165,6 +183,24 @@ router.post(
     restrictTo("collegeAdmin"),
     attachCollegeScope,
     gradebookController.publishGradebook,
+);
+
+// ===========================================
+// ADMIN RECOVERY TOOLS (University Admin)
+// ===========================================
+
+/**
+ * @route   POST /api/v1/gradebook/admin/students/:studentId/rebuild-gpa
+ * @desc    Rebuild a student's GPA from scratch (recovery tool for D-25)
+ * @access  University Admin only
+ * @audit   D-25: Designated recovery tool for concurrent publish race condition
+ *          D-26: No college_id filter for cumulative GPA
+ */
+router.post(
+    "/admin/students/:studentId/rebuild-gpa",
+    protect,
+    restrictTo("universityAdmin"),
+    gradebookController.rebuildStudentGpa,
 );
 
 export default router;
