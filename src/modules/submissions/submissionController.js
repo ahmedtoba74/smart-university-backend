@@ -73,7 +73,9 @@ export const saveAnswers = catchAsync(async (req, res, next) => {
 
     // CRIT-7: dueDate guard (Plan Section 15, Step 4)
     if (assessment.dueDate && new Date() > assessment.dueDate) {
-        return next(new AppError("The deadline for this assessment has passed.", 400));
+        return next(
+            new AppError("The deadline for this assessment has passed.", 400),
+        );
     }
 
     if (assessment.timeLimitMinutes && submission.startedAt) {
@@ -203,7 +205,9 @@ export const submitAssessment = catchAsync(async (req, res, next) => {
 
     // CRIT-7: dueDate guard (Plan Section 15, Step 3-4)
     if (assessment.dueDate && new Date() > assessment.dueDate) {
-        return next(new AppError("The deadline for this assessment has passed.", 400));
+        return next(
+            new AppError("The deadline for this assessment has passed.", 400),
+        );
     }
 
     // Step 5: Timer expiry check
@@ -514,16 +518,40 @@ export const gradeSubmission = catchAsync(async (req, res, next) => {
 
     // CRIT-9: Status guard - only 'submitted' submissions can be graded
     if (submission.status !== "submitted") {
-        return next(new AppError("Submission is not in a gradeable state.", 400));
+        return next(
+            new AppError("Submission is not in a gradeable state.", 400),
+        );
     }
 
     // CRIT-8: Staff authorization check (D-16)
-    const offering = await CourseOffering.findById(submission.courseOffering_id);
-    if (req.user.role === "doctor" && !offering.doctors_ids.some((id) => id.toString() === req.user._id.toString())) {
-        return next(new AppError("You do not have permission to perform this action.", 403));
+    const offering = await CourseOffering.findById(
+        submission.courseOffering_id,
+    );
+    if (
+        req.user.role === "doctor" &&
+        !offering.doctors_ids.some(
+            (id) => id.toString() === req.user._id.toString(),
+        )
+    ) {
+        return next(
+            new AppError(
+                "You do not have permission to perform this action.",
+                403,
+            ),
+        );
     }
-    if (req.user.role === "ta" && !offering.tas_ids.some((id) => id.toString() === req.user._id.toString())) {
-        return next(new AppError("You do not have permission to perform this action.", 403));
+    if (
+        req.user.role === "ta" &&
+        !offering.tas_ids.some(
+            (id) => id.toString() === req.user._id.toString(),
+        )
+    ) {
+        return next(
+            new AppError(
+                "You do not have permission to perform this action.",
+                403,
+            ),
+        );
     }
 
     // Step 2: Fetch assessment to get question points
@@ -536,14 +564,24 @@ export const gradeSubmission = catchAsync(async (req, res, next) => {
     if (answers && answers.length > 0) {
         for (const gradingData of answers) {
             if (gradingData.score === undefined || gradingData.score === null) {
-                return next(new AppError(`Score is required for question ${gradingData.questionId}.`, 400));
+                return next(
+                    new AppError(
+                        `Score is required for question ${gradingData.questionId}.`,
+                        400,
+                    ),
+                );
             }
             if (gradingData.score < 0) {
                 return next(new AppError("Score cannot be negative.", 400));
             }
             const question = assessment.questions.id(gradingData.questionId);
             if (question && gradingData.score > question.points) {
-                return next(new AppError(`Score ${gradingData.score} exceeds maximum ${question.points}.`, 400));
+                return next(
+                    new AppError(
+                        `Score ${gradingData.score} exceeds maximum ${question.points}.`,
+                        400,
+                    ),
+                );
             }
         }
     }

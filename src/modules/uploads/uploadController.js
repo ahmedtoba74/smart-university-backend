@@ -9,7 +9,9 @@ export const uploadGeneralFile = catchAsync(async (req, res, next) => {
 
     // 'general' is the fallback folder, or you can pass a query param ?folder=assessments
     const folder = req.query.folder || "general";
-    const isRaw = !file.mimetype.startsWith("image/") && !file.mimetype.startsWith("video/");
+    const isRaw =
+        !file.mimetype.startsWith("image/") &&
+        !file.mimetype.startsWith("video/");
     const result = await uploadToCloudinary(file.buffer, folder, isRaw);
 
     res.status(200).json({

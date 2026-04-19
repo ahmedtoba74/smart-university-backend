@@ -35,7 +35,7 @@ import * as materialController from "./materialController.js";
 const router = express.Router({ mergeParams: true });
 
 /**
- * @route   POST /api/v1/offerings/:offeringId/materials
+ * @route   POST /api/v1/course-offerings/:offeringId/materials
  * @desc    Create a new material (upload file or add external link)
  * @access  Doctors & TAs (must be assigned to course)
  * @body    { title, description, category, isExternalLink, url, fileName, fileType }
@@ -60,7 +60,7 @@ router.post(
 );
 
 /**
- * @route   GET /api/v1/offerings/:offeringId/materials
+ * @route   GET /api/v1/course-offerings/:offeringId/materials
  * @desc    Get all materials for a course offering
  * @access  Doctors, TAs, Students (enrolled), College Admins
  * @query   ?category=Lectures (optional filter)
@@ -74,7 +74,7 @@ router.get(
 );
 
 /**
- * @route   GET /api/v1/offerings/:offeringId/materials/:id
+ * @route   GET /api/v1/course-offerings/:offeringId/materials/:id
  * @desc    Get a single material by ID
  * @access  Doctors, TAs, Students (enrolled), College Admins
  */
@@ -87,7 +87,7 @@ router.get(
 );
 
 /**
- * @route   PATCH /api/v1/offerings/:offeringId/materials/:id
+ * @route   PATCH /api/v1/course-offerings/:offeringId/materials/:id
  * @desc    Update a material (title, description, category only)
  * @access  Doctors (any in course) & TAs (only their own materials)
  * @body    { title?, description?, category? }
@@ -112,7 +112,7 @@ router.patch(
 );
 
 /**
- * @route   DELETE /api/v1/offerings/:offeringId/materials/:id
+ * @route   DELETE /api/v1/course-offerings/:offeringId/materials/:id
  * @desc    Delete a material
  * @access  Doctors (any in course) & TAs (only their own materials)
  */

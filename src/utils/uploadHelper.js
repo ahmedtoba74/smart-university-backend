@@ -1,7 +1,11 @@
 import cloudinary from "./cloudinary.js";
 import { nanoid } from "nanoid";
 
-export const uploadToCloudinary = (fileBuffer, folder = "general", isRaw = false) => {
+export const uploadToCloudinary = (
+    fileBuffer,
+    folder = "general",
+    isRaw = false,
+) => {
     return new Promise((resolve, reject) => {
         const uploadOptions = {
             folder: `smart-university/${folder}`,
@@ -10,7 +14,10 @@ export const uploadToCloudinary = (fileBuffer, folder = "general", isRaw = false
         };
 
         if (!isRaw) {
-            uploadOptions.transformation = [{ quality: "auto" }, { fetch_format: "auto" }];
+            uploadOptions.transformation = [
+                { quality: "auto" },
+                { fetch_format: "auto" },
+            ];
         }
 
         const uploadStream = cloudinary.uploader.upload_stream(

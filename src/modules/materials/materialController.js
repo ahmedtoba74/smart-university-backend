@@ -282,7 +282,10 @@ export const updateMaterial = catchAsync(async (req, res, next) => {
             }
             if (!newUrl) {
                 return next(
-                    new AppError("URL is required when switching to an external link.", 400),
+                    new AppError(
+                        "URL is required when switching to an external link.",
+                        400,
+                    ),
                 );
             }
             if (material.category !== "Links") {
