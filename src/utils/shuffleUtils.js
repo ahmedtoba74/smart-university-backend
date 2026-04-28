@@ -76,6 +76,7 @@ export const seededShuffle = (array, seed) => {
      */
     const seededRandom = () => {
         seedNum = (seedNum * 1664525 + 1013904223) % Math.pow(2, 32);
+        if (seedNum < 0) seedNum += Math.pow(2, 32);
         return seedNum / Math.pow(2, 32);
     };
 

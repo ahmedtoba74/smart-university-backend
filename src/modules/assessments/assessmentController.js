@@ -178,6 +178,23 @@ export const createAssessment = catchAsync(async (req, res, next) => {
 export const getAllAssessments = catchAsync(async (req, res, next) => {
     const { offeringId } = req.params;
 
+    // Staff Security Check
+    if (req.user.role === "doctor" || req.user.role === "ta") {
+        const staffOffering = await CourseOffering.findOne({
+            _id: offeringId,
+            ...req.scopeFilter,
+            ...req.staffFilter,
+        });
+        if (!staffOffering) {
+            return next(
+                new AppError(
+                    "You do not have permission to access assessments for this course.",
+                    403,
+                ),
+            );
+        }
+    }
+
     // Step 1: Verify course offering exists
     const offering = await CourseOffering.findOne({
         _id: offeringId,
@@ -188,11 +205,68 @@ export const getAllAssessments = catchAsync(async (req, res, next) => {
         return next(new AppError("Course offering not found.", 404));
     }
 
+    // Student Enrollment Check
+    if (req.user.role === "student") {
+        const isEnrolled = await Enrollment.findOne({
+            student_id: req.user._id,
+            course_id: offeringId,
+            status: "enrolled",
+        });
+        if (!isEnrolled) {
+            return next(
+                new AppError("You are not enrolled in this course.", 403),
+            );
+        }
+    }
+
     // Step 2: Fetch assessments (isArchived: false auto-applied)
-    const assessments = await Assessment.find({
+    let assessments = await Assessment.find({
         courseOffering_id: offeringId,
         college_id: offering.college_id,
     }).sort({ dueDate: 1 }); // Earliest due date first
+
+    // Strip questions array for students and inject submission status
+    if (req.user.role === "student") {
+        const assessmentIds = assessments.map((a) => a._id);
+        const submissions = await Submission.find({
+            assessment_id: { $in: assessmentIds },
+            student_id: req.user._id,
+            college_id: offering.college_id,
+        });
+
+        const submissionMap = {};
+        submissions.forEach((sub) => {
+            submissionMap[sub.assessment_id.toString()] = sub;
+        });
+
+        assessments = assessments.map((assessment) => {
+            const doc = assessment.toObject();
+            delete doc.questions;
+
+            const sub = submissionMap[doc._id.toString()];
+            if (sub) {
+                let totalScore = sub.totalScore;
+                if (
+                    doc.settings &&
+                    doc.settings.showGradesImmediately === false
+                ) {
+                    totalScore = null;
+                }
+
+                doc.mySubmission = {
+                    _id: sub._id,
+                    status: sub.status,
+                    totalScore: totalScore,
+                    startedAt: sub.startedAt,
+                    submittedAt: sub.submittedAt,
+                };
+            } else {
+                doc.mySubmission = null;
+            }
+
+            return doc;
+        });
+    }
 
     // Note: isCorrect and modelAnswer are excluded via select: false in schema
 
@@ -224,7 +298,79 @@ export const getAllAssessments = catchAsync(async (req, res, next) => {
 export const getAssessment = catchAsync(async (req, res, next) => {
     const { offeringId, id } = req.params;
 
+    // Staff Security Check
+    if (req.user.role === "doctor" || req.user.role === "ta") {
+        const staffOffering = await CourseOffering.findOne({
+            _id: offeringId,
+            ...req.scopeFilter,
+            ...req.staffFilter,
+        });
+        if (!staffOffering) {
+            return next(
+                new AppError(
+                    "You do not have permission to access assessments for this course.",
+                    403,
+                ),
+            );
+        }
+    }
+
     // Fetch with tenant isolation and offering validation
+    let assessment = await Assessment.findOne({
+        _id: id,
+        courseOffering_id: offeringId,
+        ...req.scopeFilter,
+    });
+
+    if (!assessment) {
+        return next(new AppError("Assessment not found.", 404));
+    }
+
+    // Student Enrollment Check & Question Stripping
+    if (req.user.role === "student") {
+        const isEnrolled = await Enrollment.findOne({
+            student_id: req.user._id,
+            course_id: offeringId,
+            status: "enrolled",
+        });
+        if (!isEnrolled) {
+            return next(
+                new AppError("You are not enrolled in this course.", 403),
+            );
+        }
+
+        const doc = assessment.toObject();
+        delete doc.questions;
+        assessment = doc;
+    }
+
+    res.status(200).json({
+        status: "success",
+        data: { assessment },
+    });
+});
+
+/**
+ * Get student's submission for an assessment
+ *
+ * @route   GET /api/v1/offerings/:offeringId/assessments/:id/my-submission
+ * @access  Students (enrolled)
+ */
+export const getMySubmission = catchAsync(async (req, res, next) => {
+    const { offeringId, id } = req.params;
+
+    // Verify Enrollment
+    const isEnrolled = await Enrollment.findOne({
+        student_id: req.user._id,
+        course_id: offeringId,
+        status: "enrolled",
+    });
+
+    if (!isEnrolled) {
+        return next(new AppError("You are not enrolled in this course.", 403));
+    }
+
+    // Fetch assessment to check showGradesImmediately
     const assessment = await Assessment.findOne({
         _id: id,
         courseOffering_id: offeringId,
@@ -235,9 +381,32 @@ export const getAssessment = catchAsync(async (req, res, next) => {
         return next(new AppError("Assessment not found.", 404));
     }
 
+    // Fetch submission
+    let submission = await Submission.findOne({
+        assessment_id: id,
+        student_id: req.user._id,
+        college_id: req.scopeFilter.college_id,
+    });
+
+    if (!submission) {
+        return next(
+            new AppError("You have not started this assessment yet.", 404),
+        );
+    }
+
+    if (
+        assessment.settings &&
+        assessment.settings.showGradesImmediately === false
+    ) {
+        const subDoc = submission.toObject();
+        delete subDoc.answers;
+        subDoc.totalScore = null;
+        submission = subDoc;
+    }
+
     res.status(200).json({
         status: "success",
-        data: { assessment },
+        data: { submission },
     });
 });
 
@@ -276,6 +445,23 @@ export const updateAssessment = catchAsync(async (req, res, next) => {
         settings,
         doctorDeclaredTotal,
     } = req.body;
+
+    // Staff Security Check
+    if (req.user.role === "doctor" || req.user.role === "ta") {
+        const staffOffering = await CourseOffering.findOne({
+            _id: offeringId,
+            ...req.scopeFilter,
+            ...req.staffFilter,
+        });
+        if (!staffOffering) {
+            return next(
+                new AppError(
+                    "You do not have permission to access assessments for this course.",
+                    403,
+                ),
+            );
+        }
+    }
 
     // Step 1: Fetch assessment (findById for save() pattern)
     const assessment = await Assessment.findOne({
@@ -420,6 +606,23 @@ export const updateAssessment = catchAsync(async (req, res, next) => {
  */
 export const deleteAssessment = catchAsync(async (req, res, next) => {
     const { offeringId, id } = req.params;
+
+    // Staff Security Check
+    if (req.user.role === "doctor" || req.user.role === "ta") {
+        const staffOffering = await CourseOffering.findOne({
+            _id: offeringId,
+            ...req.scopeFilter,
+            ...req.staffFilter,
+        });
+        if (!staffOffering) {
+            return next(
+                new AppError(
+                    "You do not have permission to access assessments for this course.",
+                    403,
+                ),
+            );
+        }
+    }
 
     // Fetch assessment
     const assessment = await Assessment.findOne({

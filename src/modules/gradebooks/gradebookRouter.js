@@ -95,7 +95,7 @@ router.patch(
 router.post(
     "/course/:offeringId/lock-semester-work",
     protect,
-    restrictTo("doctor"),
+    restrictTo("doctor", "collegeAdmin", "universityAdmin"),
     attachCollegeScope,
     attachStaffScope,
     gradebookController.lockSemesterWork,
@@ -111,7 +111,7 @@ router.post(
 router.post(
     "/course/:offeringId/unlock-semester-work",
     protect,
-    restrictTo("universityAdmin"),
+    restrictTo("universityAdmin", "collegeAdmin", "doctor"),
     attachCollegeScope,
     gradebookController.unlockSemesterWork,
 );

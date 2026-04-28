@@ -10,6 +10,7 @@
 
 import Material from "../../../DB/models/materialModel.js";
 import CourseOffering from "../../../DB/models/courseOfferingModel.js";
+import Enrollment from "../../../DB/models/enrollmentModel.js";
 import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
 import {
@@ -48,6 +49,7 @@ export const createMaterial = catchAsync(async (req, res, next) => {
     const offering = await CourseOffering.findOne({
         _id: offeringId,
         ...req.scopeFilter,
+        ...req.staffFilter,
     });
 
     if (!offering) {
@@ -145,10 +147,26 @@ export const getAllMaterials = catchAsync(async (req, res, next) => {
     const offering = await CourseOffering.findOne({
         _id: offeringId,
         ...req.scopeFilter,
+        ...req.staffFilter,
     });
 
     if (!offering) {
         return next(new AppError("Course offering not found.", 404));
+    }
+
+    // Security Check: Verify student is enrolled
+    if (req.user.role === "student") {
+        const isEnrolled = await Enrollment.findOne({
+            student_id: req.user._id,
+            course_id: offeringId,
+            status: "enrolled",
+        });
+
+        if (!isEnrolled) {
+            return next(
+                new AppError("You are not enrolled in this course.", 403),
+            );
+        }
     }
 
     // Step 2: Build query filter
@@ -194,6 +212,23 @@ export const getAllMaterials = catchAsync(async (req, res, next) => {
 export const getMaterial = catchAsync(async (req, res, next) => {
     const { offeringId, id } = req.params;
 
+    // Staff Security Check: Verify staff is assigned to the course offering
+    if (req.user.role === "doctor" || req.user.role === "ta") {
+        const offering = await CourseOffering.findOne({
+            _id: offeringId,
+            ...req.scopeFilter,
+            ...req.staffFilter,
+        });
+        if (!offering) {
+            return next(
+                new AppError(
+                    "You do not have permission to access materials for this course.",
+                    403,
+                ),
+            );
+        }
+    }
+
     // Fetch material with tenant isolation and offering validation
     const material = await Material.findOne({
         _id: id,
@@ -203,6 +238,21 @@ export const getMaterial = catchAsync(async (req, res, next) => {
 
     if (!material) {
         return next(new AppError("Material not found.", 404));
+    }
+
+    // Security Check: Verify student is enrolled
+    if (req.user.role === "student") {
+        const isEnrolled = await Enrollment.findOne({
+            student_id: req.user._id,
+            course_id: offeringId,
+            status: "enrolled",
+        });
+
+        if (!isEnrolled) {
+            return next(
+                new AppError("You are not enrolled in this course.", 403),
+            );
+        }
     }
 
     res.status(200).json({
@@ -237,6 +287,23 @@ export const getMaterial = catchAsync(async (req, res, next) => {
 export const updateMaterial = catchAsync(async (req, res, next) => {
     const { offeringId, id } = req.params;
     let { title, description, category, isExternalLink, url } = req.body;
+
+    // Staff Security Check: Verify staff is assigned to the course offering
+    if (req.user.role === "doctor" || req.user.role === "ta") {
+        const offering = await CourseOffering.findOne({
+            _id: offeringId,
+            ...req.scopeFilter,
+            ...req.staffFilter,
+        });
+        if (!offering) {
+            return next(
+                new AppError(
+                    "You do not have permission to access materials for this course.",
+                    403,
+                ),
+            );
+        }
+    }
 
     // Step 1: Fetch material with tenant isolation
     const material = await Material.findOne({
@@ -399,6 +466,23 @@ export const updateMaterial = catchAsync(async (req, res, next) => {
  */
 export const deleteMaterial = catchAsync(async (req, res, next) => {
     const { offeringId, id } = req.params;
+
+    // Staff Security Check: Verify staff is assigned to the course offering
+    if (req.user.role === "doctor" || req.user.role === "ta") {
+        const offering = await CourseOffering.findOne({
+            _id: offeringId,
+            ...req.scopeFilter,
+            ...req.staffFilter,
+        });
+        if (!offering) {
+            return next(
+                new AppError(
+                    "You do not have permission to access materials for this course.",
+                    403,
+                ),
+            );
+        }
+    }
 
     // Step 1: Fetch material with tenant isolation
     const material = await Material.findOne({

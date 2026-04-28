@@ -1,4 +1,5 @@
 import User from "../../../DB/models/userModel.js";
+import College from "../../../DB/models/collegeModel.js";
 import BulkImportLog from "../../../DB/models/bulkImportLogModel.js";
 import Department from "../../../DB/models/departmentModel.js";
 import catchAsync from "../../utils/catchAsync.js";
@@ -96,15 +97,23 @@ export const createUser = catchAsync(async (req, res, next) => {
     if (req.user.role === "collegeAdmin") {
         college_id = req.user.college_id; // Always override
     } else if (req.user.role === "universityAdmin") {
-        if (!req.body.college_id) {
-            return next(
-                new AppError(
-                    "universityAdmin must explicitly provide a college_id to create a user.",
-                    400,
-                ),
-            );
+        if (req.body.role !== "universityAdmin") {
+            const collegeExists = await College.findOne({
+                _id: req.body.college_id,
+            });
+            if (!collegeExists) {
+                return next(new AppError("College not found", 404));
+            }
+            if (!req.body.college_id) {
+                return next(
+                    new AppError(
+                        "universityAdmin must explicitly provide a college_id to create a user.",
+                        400,
+                    ),
+                );
+            }
+            college_id = req.body.college_id;
         }
-        college_id = req.body.college_id;
     }
 
     // 3. Photo Upload

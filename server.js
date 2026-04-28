@@ -1,6 +1,6 @@
-import dotenv from 'dotenv';
-import dbConnection from './DB/dbConnection.js';
-import app from './app.js';
+import dotenv from "dotenv";
+import dbConnection from "./DB/dbConnection.js";
+import app from "./app.js";
 
 process.on("uncaughtException", (err) => {
     console.error("Uncaught Exception! Shutting down...");
@@ -37,9 +37,9 @@ process.on("unhandledRejection", (err) => {
     });
 });
 
-process.on('SIGTERM', () => {
-    console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
+process.on("SIGTERM", () => {
+    console.log("👋 SIGTERM RECEIVED. Shutting down gracefully");
     server.close(() => {
-        console.log('💥 Process terminated!');
+        console.log("💥 Process terminated!");
     });
 });

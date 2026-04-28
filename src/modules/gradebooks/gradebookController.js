@@ -189,7 +189,7 @@ export const updateSemesterWork = catchAsync(async (req, res, next) => {
     if (offering.semesterWorkLocked) {
         return next(
             new AppError(
-                "Semester work is locked. Midterm grades cannot be modified.",
+                "Semester work is locked. grades cannot be modified.",
                 403,
             ),
         );
@@ -493,7 +493,7 @@ async function autoGradeGhostSubmission(submission, assessment) {
  * 4. Unlock offering
  *
  * @route   POST /api/v1/gradebook/course/:offeringId/unlock-semester-work
- * @access  Doctors (assigned to course)
+ * @access  University Admin and College Admin
  *
  * @param   {Object} req.params.offeringId - Course offering ID
  * @param   {Object} req.user - Authenticated doctor

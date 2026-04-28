@@ -62,6 +62,7 @@ router.get(
     protect,
     restrictTo("doctor", "ta", "student", "collegeAdmin"),
     attachCollegeScope,
+    attachStaffScope,
     assessmentController.getAllAssessments,
 );
 
@@ -76,7 +77,21 @@ router.get(
     protect,
     restrictTo("doctor", "ta", "student", "collegeAdmin"),
     attachCollegeScope,
+    attachStaffScope,
     assessmentController.getAssessment,
+);
+
+/**
+ * @route   GET /api/v1/course-offerings/:offeringId/assessments/:id/my-submission
+ * @desc    Get student's own submission for a specific assessment
+ * @access  Students (enrolled)
+ */
+router.get(
+    "/:id/my-submission",
+    protect,
+    restrictTo("student"),
+    attachCollegeScope,
+    assessmentController.getMySubmission,
 );
 
 /**

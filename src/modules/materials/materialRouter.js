@@ -70,6 +70,7 @@ router.get(
     protect,
     restrictTo("doctor", "ta", "student", "collegeAdmin"),
     attachCollegeScope,
+    attachStaffScope,
     materialController.getAllMaterials,
 );
 
@@ -83,6 +84,7 @@ router.get(
     protect,
     restrictTo("doctor", "ta", "student", "collegeAdmin"),
     attachCollegeScope,
+    attachStaffScope,
     materialController.getMaterial,
 );
 
