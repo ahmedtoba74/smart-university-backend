@@ -179,6 +179,23 @@ export const loginStepOne = catchAsync(async (req, res, next) => {
 
     // === Success ===
 
+    // TEMPORARY: Bypass OTP for testing/development. Return token directly.
+    if (user.loginAttempts > 0 || user.lockUntil) {
+        user.loginAttempts = 0;
+        user.lockoutStage = 0;
+        user.lockUntil = undefined;
+    }
+    user.lastLoginAt = Date.now();
+    await user.save({ validateBeforeSave: false });
+
+    return createSendToken(
+        user,
+        200,
+        res,
+        "Logged in successfully (OTP disabled for testing)",
+    );
+
+    /* --- TEMPORARILY DISABLED OTP LOGIC ---
     // NOTE: We do NOT reset lockout counters here anymore.
     // This prevents attackers from resetting their failed attempts by re-authenticating Step 1.
 
@@ -205,6 +222,7 @@ export const loginStepOne = catchAsync(async (req, res, next) => {
         await user.save({ validateBeforeSave: false });
         return next(new AppError(`Error sending email. Try again!`, 500));
     }
+    ----------------------------------------- */
 });
 
 // 2. Login Step 2: Verify OTP & Issue Token
