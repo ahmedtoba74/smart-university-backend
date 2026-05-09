@@ -79,6 +79,12 @@ const userSchema = new mongoose.Schema(
             ],
             default: "student",
         },
+        /**
+         * @field rfidTag - Unique RFID card tag identifier.
+         * @deprecated Phase 5 switched from RFID to biometric fingerprint attendance.
+         * Retained as sparse/optional field for potential future multi-factor use
+         * (e.g., RFID + fingerprint two-factor check-in). Safe to leave in schema.
+         */
         rfidTag: {
             type: String,
             unique: true,
