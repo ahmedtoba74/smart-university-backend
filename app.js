@@ -101,10 +101,9 @@ app.enable("trust proxy");
 
 // Enable CORS – allow frontend origin (localhost in dev, FRONTEND_URL in prod)
 const allowedOrigins = [
-    "https://frontwebapp-fshqdheshabmc4dh.westus-01.azurewebsites.net",
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:5173",
+    "http://9.235.150.51",
+    "https://9.235.150.51",
+    "https://9.235.150.51",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
     "http://127.0.0.1:5173",
