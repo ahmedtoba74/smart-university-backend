@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import dbConnection from "./DB/dbConnection.js";
 import app from "./app.js";
+import { expireDueSessions } from "./src/utils/attendanceUtils.js";
 
 process.on("uncaughtException", (err) => {
     console.error("Uncaught Exception! Shutting down...");
@@ -29,6 +30,16 @@ const server = app.listen(port, () => {
     `);
 });
 
+// Phase 5 — Session expiry cleanup: check every 5 minutes for sessions
+// that have passed their expiresAt time and are still marked 'active'.
+// expireDueSessions transitions them to 'expired', clears device templates
+// (best-effort), and recalculates attendance for all enrolled students.
+const sessionCleanupInterval = setInterval(() => {
+    expireDueSessions().catch((err) =>
+        console.error('[SessionCleanup] Error:', err.message),
+    );
+}, 5 * 60 * 1000);
+
 process.on("unhandledRejection", (err) => {
     console.error("Unhandled Rejection! Shutting down...");
     console.error(err.name, err.message);
@@ -39,6 +50,7 @@ process.on("unhandledRejection", (err) => {
 
 process.on("SIGTERM", () => {
     console.log("👋 SIGTERM RECEIVED. Shutting down gracefully");
+    clearInterval(sessionCleanupInterval);
     server.close(() => {
         console.log("💥 Process terminated!");
     });

@@ -50,7 +50,7 @@ const locationSchema = new mongoose.Schema(
         },
         /**
          * @field status - Controls whether the room is available for scheduling.
-         * CollegeAdmin can set to 'maintenance' to block RFID attendance and scheduling.
+         * CollegeAdmin can set to 'maintenance' to block fingerprint attendance and scheduling.
          */
         status: {
             type: String,
@@ -58,8 +58,9 @@ const locationSchema = new mongoose.Schema(
             default: "active",
         },
         /**
-         * @field readerId - The unique RFID/NFC device ID bound to this room.
-         * Required for the QR/RFID attendance system to validate student location.
+         * @field readerId - IoT Fingerprint Device ID bound to this room.
+         * Used by the fingerprint attendance system to resolve which room a device belongs
+         * to and which active session it should be marking attendance for.
          */
         readerId: {
             type: String,

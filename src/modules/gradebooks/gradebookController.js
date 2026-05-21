@@ -16,6 +16,7 @@
 
 import Enrollment from "../../../DB/models/enrollmentModel.js";
 import CourseOffering from "../../../DB/models/courseOfferingModel.js";
+import AttendanceSession from "../../../DB/models/attendanceSessionModel.js";
 import User from "../../../DB/models/userModel.js";
 import Settings from "../../../DB/models/settingsModel.js";
 import Assessment from "../../../DB/models/assessmentModel.js";
@@ -260,6 +261,25 @@ export const updateSemesterWork = catchAsync(async (req, res, next) => {
                 400,
             ),
         );
+    }
+
+    // CRIT-5: If fingerprint attendance sessions exist for this offering, block manual
+    // attendance grade entry. Attendance is automatically managed by the Phase 5
+    // fingerprint attendance system; manual entry would corrupt recalculated percentages.
+    // NOTE: Only attendance updates are blocked — midterm and project updates proceed normally.
+    const hasAttendanceUpdate = grades.some((g) => g.attendance !== undefined);
+    if (hasAttendanceUpdate) {
+        const sessionCount = await AttendanceSession.countDocuments({
+            courseOffering_id: offeringId,
+        });
+        if (sessionCount > 0) {
+            return next(
+                new AppError(
+                    'Attendance grades are managed automatically by the fingerprint attendance system. Manual entry is blocked.',
+                    400,
+                ),
+            );
+        }
     }
 
     // Step 6: Bulk write

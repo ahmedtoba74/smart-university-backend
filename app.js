@@ -54,6 +54,8 @@ import enrollmentRouter from "./src/modules/enrollments/enrollmentRouter.js";
 import submissionRouter from "./src/modules/submissions/submissionRouter.js";
 import gradebookRouter from "./src/modules/gradebooks/gradebookRouter.js";
 import uploadRouter from "./src/modules/uploads/uploadRouter.js";
+// Phase 5 — Fingerprint Attendance (GAP-5)
+import attendanceRouter from "./src/modules/attendance/attendanceRouter.js";
 
 // Load env vars
 dotenv.config();
@@ -61,14 +63,21 @@ dotenv.config();
 // Validate essential environment variables
 const requiredEnvVars = [
     "PORT",
-    "DB_CONNECTION",
     "JWT_SECRET",
     "ENCRYPTION_KEY",
     "HASH_SECRET",
     "EMAIL_HOST",
+    // Phase 5 — IoT device shared secret is required at startup (BE-CRIT-4).
+    // IOT_HUB_CONNECTION_STRING is intentionally NOT here — optional when IOT_MOCK_MODE=true.
+    "IOT_DEVICE_SECRET",
 ];
 
 const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
+
+// Database connection requires either MONGO_URI or DB_CONNECTION
+if (!process.env.DB_CONNECTION && !process.env.MONGO_URI) {
+    missingEnvVars.push("DB_CONNECTION (or MONGO_URI)");
+}
 
 if (missingEnvVars.length > 0) {
     console.error("################################################");
@@ -140,6 +149,18 @@ const limiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     validate: { trustProxy: false },
+    // CRIT-2: Exempt IoT device endpoints from rate limiting.
+    // IMPORTANT: Use req.originalUrl — NOT req.path.
+    // When mounted at '/api', req.path becomes relative (e.g. '/v1/attendance/fingerprint-mark')
+    // and never matches the full path. req.originalUrl always contains the full original URL.
+    skip: (req) => {
+        const iotPaths = [
+            "/api/v1/attendance/fingerprint-mark",
+            "/api/v1/attendance/fingerprints/register",
+            "/api/v1/attendance/devices/heartbeat",
+        ];
+        return iotPaths.some((p) => req.originalUrl.startsWith(p));
+    },
 });
 
 // Apply rate limiter to all requests
@@ -158,7 +179,9 @@ app.use(
         xss: true,
         noSql: true,
         sql: false,
-        whitelist: ["password", "passwordConfirm", "currentPassword"],
+        // CRIT-1: 'templateData' is whitelisted because fingerprint templates are base64-encoded.
+        // Base64 chars (+, /, =) trigger XSS sanitization rules and silently corrupt binary data.
+        whitelist: ["password", "passwordConfirm", "currentPassword", "templateData"],
     }),
 );
 
@@ -231,6 +254,9 @@ app.use("/api/v1/enrollments", enrollmentRouter);
 app.use("/api/v1/submissions", submissionRouter);
 app.use("/api/v1/gradebook", gradebookRouter);
 app.use("/api/v1/uploads", uploadRouter);
+
+// Phase 5 — Fingerprint Attendance System (GAP-5)
+app.use("/api/v1/attendance", attendanceRouter);
 
 // Handle Unhandled Routes
 app.all(/(.*)/, (req, res, next) => {

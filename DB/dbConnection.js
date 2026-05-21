@@ -20,6 +20,19 @@ const dbConnection = async () => {
             console.log(`Database Connected successfully`);
             console.log(`  → Database name: "${dbName}"`);
             console.log(`  → Host: ${host}`);
+
+            // CRIT-4: Drop the legacy TTL index on AttendanceSession.expiresAt.
+            // The old schema used { expireAfterSeconds: 0 }, which caused MongoDB to
+            // auto-delete expired sessions. This silently shrinks totalSessions over
+            // time and inflates all attendance percentages. Sessions must be permanent
+            // historical records — they are ended explicitly, never auto-deleted.
+            // Schema change alone is NOT enough; the index must be dropped in MongoDB.
+            // .catch(() => {}) is intentional: safe to run on every startup;
+            // silently no-ops after the first successful drop.
+            mongoose.connection.db
+                .collection("attendancesessions")
+                .dropIndex("expiresAt_1")
+                .catch(() => {});
         })
         .catch((err) => {
             console.log(`Database Error: ${err}`);

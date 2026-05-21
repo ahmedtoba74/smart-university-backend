@@ -155,3 +155,62 @@ export const decryptBulkPassword = (ciphertext, secret) => {
         return null;
     }
 };
+
+// ===================================================================================
+// Phase 5 — Fingerprint Template Encryption (AES-256-GCM)
+// ===================================================================================
+// These functions differ from encryptBulkPassword in three key ways:
+//   1. They accept/return Buffer objects (not strings) — raw binary biometric data.
+//   2. They use a 12-byte IV (the NIST-recommended length for GCM mode).
+//   3. They reuse the global ENCRYPTION_KEY (validated to 32 bytes at module load).
+// Decryption is called ONLY inside iotHubService.pushTemplatesToDevice().
+// The encrypted fields are stored with select: false — never returned by any API.
+// ===================================================================================
+
+/**
+ * Encrypt a raw fingerprint template Buffer using AES-256-GCM.
+ * @function encryptFingerprintTemplate
+ * @param {Buffer} templateBuffer - Raw 768-byte fingerprint template from R503 sensor.
+ * @returns {{ ciphertext: string, iv: string, authTag: string }}
+ *   ciphertext: base64-encoded encrypted template
+ *   iv:         12-byte GCM IV as hex string
+ *   authTag:    16-byte GCM auth tag as hex string
+ */
+export const encryptFingerprintTemplate = (templateBuffer) => {
+    // 12-byte IV is the NIST recommended length for AES-GCM (96-bit nonce)
+    const iv = crypto.randomBytes(12);
+    const key = Buffer.from(ENCRYPTION_KEY);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const encrypted = Buffer.concat([cipher.update(templateBuffer), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+    return {
+        ciphertext: encrypted.toString('base64'),
+        iv: iv.toString('hex'),
+        authTag: authTag.toString('hex'),
+    };
+};
+
+/**
+ * Decrypt an encrypted fingerprint template back to a raw Buffer.
+ * Called only inside iotHubService — never in route handlers or controllers.
+ * @function decryptFingerprintTemplate
+ * @param {{ ciphertext: string, iv: string, authTag: string }} encrypted
+ *   ciphertext: base64-encoded encrypted template (from templateData field)
+ *   iv:         hex-encoded 12-byte IV (from templateIv field)
+ *   authTag:    hex-encoded 16-byte auth tag (from templateAuthTag field)
+ * @returns {Buffer} Raw fingerprint template bytes, ready to push to the R503.
+ * @throws {Error} If authentication tag verification fails (tampered data).
+ */
+export const decryptFingerprintTemplate = ({ ciphertext, iv, authTag }) => {
+    const key = Buffer.from(ENCRYPTION_KEY);
+    const decipher = crypto.createDecipheriv(
+        'aes-256-gcm',
+        key,
+        Buffer.from(iv, 'hex'),
+    );
+    decipher.setAuthTag(Buffer.from(authTag, 'hex'));
+    return Buffer.concat([
+        decipher.update(Buffer.from(ciphertext, 'base64')),
+        decipher.final(),
+    ]);
+};
