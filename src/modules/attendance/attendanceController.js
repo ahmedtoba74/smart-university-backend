@@ -226,6 +226,7 @@ export const createSession = catchAsync(async (req, res, next) => {
     // ── 8. Push Templates to Device ───────────────────────────────────────────
     let templateLoadStatus = 'pending';
     let templatesLoadedCount = 0;
+    let finalTemplateMapping = templateMapping;
 
     if (!qrFallbackEnabled && deviceId) {
         const iotResult = await iotHubService.pushTemplatesToDevice(
@@ -233,12 +234,29 @@ export const createSession = catchAsync(async (req, res, next) => {
             templates,
             { sessionId, sessionNonce, templateBatchId },
         );
-        if (iotResult.success) {
+        const loaded = iotResult.templatesLoaded ?? 0;
+        const requested = iotResult.totalRequested ?? templates.length;
+
+        if (iotResult.success && loaded === requested) {
             templateLoadStatus = 'loaded';
-            templatesLoadedCount = iotResult.templatesLoaded || templates.length;
+            templatesLoadedCount = loaded;
+        } else if (loaded > 0 && loaded < requested) {
+            // D-2A: partial load — trim mapping to loaded indices only, enable QR
+            templateLoadStatus = 'failed';
+            templatesLoadedCount = loaded;
+            finalTemplateMapping = templateMapping.slice(0, loaded);
+            qrFallbackEnabled = true;
+            console.warn(
+                `[createSession] Partial template load on ${deviceId}: ${loaded}/${requested}. ` +
+                    `QR fallback enabled.`,
+            );
         } else {
             templateLoadStatus = 'failed';
-            qrFallbackEnabled = true; // Auto-fallback on partial/failed load
+            templatesLoadedCount = 0;
+            qrFallbackEnabled = true;
+            if (iotResult.error) {
+                console.warn(`[createSession] Template push failed: ${iotResult.error}`);
+            }
         }
     } else if (qrFallbackEnabled) {
         templateLoadStatus = 'qr_fallback';
@@ -264,7 +282,7 @@ export const createSession = catchAsync(async (req, res, next) => {
         status: 'active',
         templateLoadStatus,
         templatesLoadedCount,
-        templateMapping,
+        templateMapping: finalTemplateMapping,
         qrFallbackEnabled,
         qrFallbackToken: initialQrToken,
         qrTokenExpiresAt: initialQrExpiry,
@@ -366,7 +384,7 @@ export const endSession = catchAsync(async (req, res, next) => {
     // ── 4. Clear Device Templates (best-effort) ───────────────────────────────
     if (session.deviceId) {
         await iotHubService
-            .clearDeviceTemplates(session.deviceId)
+            .clearDeviceTemplates(session.deviceId, session._id)
             .catch((err) =>
                 console.error(`[endSession] clearDeviceTemplates failed: ${err.message}`),
             );
@@ -1024,7 +1042,22 @@ export const triggerEnrollMode = catchAsync(async (req, res, next) => {
  * @access IoT device (x-device-secret)
  */
 export const registerFingerprint = catchAsync(async (req, res, next) => {
-    const { studentId, enrollmentNonce, deviceId, templateData, quality } = req.body;
+    const { studentId, enrollmentNonce, deviceId, templateData, quality, success } = req.body;
+
+    if (success === false) {
+        return next(
+            new AppError(
+                req.body.error
+                    ? `Enrollment failed on device: ${req.body.error}`
+                    : 'Enrollment failed on device.',
+                400,
+            ),
+        );
+    }
+
+    if (!enrollmentNonce) {
+        return next(new AppError('enrollmentNonce is required.', 400));
+    }
 
     // ── 1. Validate Enrollment Request ────────────────────────────────────────
     const request = await FingerprintEnrollmentRequest.findOne({

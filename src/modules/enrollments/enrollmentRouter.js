@@ -81,7 +81,7 @@ router
 
 router.patch(
     "/:id/withdraw",
-    restrictTo("universityAdmin", "universityAdmin", "student"),
+    restrictTo("universityAdmin", "collegeAdmin", "student"),
     attachCollegeScope,
     enrollmentController.withdrawStudent,
 );

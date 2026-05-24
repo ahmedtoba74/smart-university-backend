@@ -239,7 +239,7 @@ export const expireDueSessions = async () => {
             // Best-effort device template clear — failure must NOT block recalculation
             if (session.deviceId) {
                 await iotHubService
-                    .clearDeviceTemplates(session.deviceId)
+                    .clearDeviceTemplates(session.deviceId, session._id)
                     .catch((err) =>
                         console.error(
                             `[expireDueSessions] clearDeviceTemplates failed for ${session.deviceId}: ${err.message}`,

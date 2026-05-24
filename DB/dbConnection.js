@@ -32,7 +32,7 @@ const dbConnection = async () => {
             mongoose.connection.db
                 .collection("attendancesessions")
                 .dropIndex("expiresAt_1")
-                .catch(() => {});
+                .catch(() => { });
         })
         .catch((err) => {
             console.log(`Database Error: ${err}`);
