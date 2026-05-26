@@ -1,7 +1,9 @@
 import dotenv from "dotenv";
+import http from "http";
 import dbConnection from "./DB/dbConnection.js";
 import app from "./app.js";
 import { expireDueSessions } from "./src/utils/attendanceUtils.js";
+import { initSocket } from "./src/services/socketService.js";
 
 process.on("uncaughtException", (err) => {
     console.error("Uncaught Exception! Shutting down...");
@@ -15,7 +17,10 @@ const port = process.env.PORT || 3000;
 
 dbConnection();
 
-const server = app.listen(port, () => {
+const server = http.createServer(app);
+initSocket(server);
+
+server.listen(port, () => {
     console.log(`
       ################################################
       🛡️  Smart University Server Listening on Port: ${port} 🛡️
@@ -25,6 +30,7 @@ const server = app.listen(port, () => {
       📅  Date:       ${new Date().toISOString()}
       💾  Database:   Connected
       🔒  Security:   Enabled (Helmet, RateLimit, Sanitizer)
+      🔌  WebSocket:  Enabled (Socket.io)
       
       ################################################
     `);

@@ -41,6 +41,7 @@ import AppError from "./src/utils/appError.js";
 import globalErrorHandler from "./src/utils/errorHandler.js";
 import sanitizer from "perfect-express-sanitizer";
 import toobusy from "toobusy-js";
+import { allowedOrigins } from "./src/config/corsConfig.js";
 
 import userRouter from "./src/modules/users/userRouter.js";
 import authRouter from "./src/modules/auth/authRouter.js";
@@ -56,6 +57,8 @@ import gradebookRouter from "./src/modules/gradebooks/gradebookRouter.js";
 import uploadRouter from "./src/modules/uploads/uploadRouter.js";
 // Phase 5 — Fingerprint Attendance (GAP-5)
 import attendanceRouter from "./src/modules/attendance/attendanceRouter.js";
+// Phase 6 — Announcements & Real-Time Notifications Engine
+import announcementRouter from "./src/modules/announcements/announcementRouter.js";
 
 // Load env vars
 dotenv.config();
@@ -109,17 +112,8 @@ app.use(function (req, res, next) {
 app.enable("trust proxy");
 
 // Enable CORS – allow frontend origin (localhost in dev, FRONTEND_URL in prod)
-const allowedOrigins = [
-    "http://9.235.150.51",
-    "https://9.235.150.51",
-    "https://9.235.150.51",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001",
-    "http://127.0.0.1:5173",
-];
-if (process.env.FRONTEND_URL) {
-    allowedOrigins.push(process.env.FRONTEND_URL);
-}
+// allowedOrigins is imported from src/config/corsConfig.js — single source of truth
+// shared with the Socket.io server (socketService.js).
 app.use(
     cors({
         origin: (origin, cb) => {
@@ -258,7 +252,10 @@ app.use("/api/v1/uploads", uploadRouter);
 // Phase 5 — Fingerprint Attendance System (GAP-5)
 app.use("/api/v1/attendance", attendanceRouter);
 
-// Handle Unhandled Routes
+// Phase 6 — Announcements & Real-Time Notifications Engine
+app.use("/api/v1/announcements", announcementRouter);
+
+// Handle Unhandled Routes — MUST REMAIN LAST
 app.all(/(.*)/, (req, res, next) => {
     next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });

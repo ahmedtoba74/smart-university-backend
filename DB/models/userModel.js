@@ -149,7 +149,7 @@ const userSchema = new mongoose.Schema(
             index: true,
         },
 
-        // --- Student Academic Info (بيانات الطالب الأكاديمية) ---
+        // --- Student Academic Info ---
         level: {
             type: Number,
             enum: [1, 2, 3, 4, 5],
