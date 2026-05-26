@@ -6,3 +6,6 @@ data
 .DS_Store
 coverage
 .nyc_output
+scripts
+.vscode
+seed-iot.js
