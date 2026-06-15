@@ -3,11 +3,12 @@
 // the Express HTTP server (app.js) and the Socket.io server (socketService.js).
 
 export const allowedOrigins = [
-    "http://9.235.150.51",
-    "https://9.235.150.51",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001",
-    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:5173",
+    "smart-frontend-ege8cxbjbwfrhnah.austriaeast-01.azurewebsites.net",
+    "http://smart-frontend-ege8cxbjbwfrhnah.austriaeast-01.azurewebsites.net",
+    "https://smart-frontend-ege8cxbjbwfrhnah.austriaeast-01.azurewebsites.net",
 ];
 
 // Inject production frontend URL at runtime if configured

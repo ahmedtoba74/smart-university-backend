@@ -4,7 +4,7 @@ import User from "../../DB/models/userModel.js";
 
 /**
  * Socket.io authentication middleware.
- * Mirrors protect() from authMiddleware.js with the same 5 security checks,
+ * Mirrors protect() from authMiddleware.js with the same 6 security checks,
  * adapted for the Socket.io handshake signature (socket, next).
  *
  * Guards applied in order:
