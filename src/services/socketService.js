@@ -4,7 +4,7 @@
 
 import { Server } from "socket.io";
 import { socketProtect } from "../middlewares/socketMiddleware.js";
-import { allowedOrigins } from "../config/corsConfig.js";
+import { corsOriginHandler } from "../config/corsConfig.js";
 import Enrollment from "../../DB/models/enrollmentModel.js";
 import CourseOffering from "../../DB/models/courseOfferingModel.js";
 import Department from "../../DB/models/departmentModel.js";
@@ -19,15 +19,9 @@ let io = null;
 export const initSocket = (httpServer) => {
     io = new Server(httpServer, {
         cors: {
-            origin: (origin, cb) => {
-                if (!origin || allowedOrigins.includes(origin))
-                    return cb(null, true);
-                // Allow all origins in development for testing
-                if (process.env.NODE_ENV !== "production")
-                    return cb(null, true);
-                // Silent rejection — cb(null, false) prevents log pollution
-                return cb(null, false);
-            },
+            // Shared handler: warns on blocked origins in production instead of silent drop.
+            // Defined in src/config/corsConfig.js — single source of truth with app.js.
+            origin: corsOriginHandler,
             credentials: true,
         },
     });
@@ -69,17 +63,13 @@ export const initSocket = (httpServer) => {
                 enrollments.forEach((e) => {
                     socket.join(`course:${e.course_id.toString()}`);
                 });
-
             } else if (user.role === "doctor" || user.role === "ta") {
                 // Intentionally excludes archived CourseOfferings (pre-find hook default).
                 // Archived courses do not generate new announcements.
                 // Sockets are for real-time delivery only.
                 // REST GET uses isArchived: { $in: [true, false] } for historical data.
                 const offerings = await CourseOffering.find({
-                    $or: [
-                        { doctors_ids: user._id },
-                        { tas_ids: user._id },
-                    ],
+                    $or: [{ doctors_ids: user._id }, { tas_ids: user._id }],
                 })
                     .select("_id")
                     .lean();
@@ -87,8 +77,17 @@ export const initSocket = (httpServer) => {
                 offerings.forEach((o) => {
                     socket.join(`course:${o._id.toString()}`);
                 });
-
             } else if (user.role === "collegeAdmin") {
+                // Hard stop: without a college_id the queries below become unconstrained
+                // (college_id: undefined matches all documents), causing this socket to
+                // subscribe to every department and course room system-wide.
+                // This is a data-integrity requirement, not just a validation nicety.
+                if (!user.college_id) {
+                    throw new Error(
+                        `collegeAdmin ${user._id} is missing college_id — room subscription aborted to prevent over-subscription.`,
+                    );
+                }
+
                 // CollegeAdmin joins all department rooms in their college
                 const depts = await Department.find({
                     college_id: user.college_id,
@@ -118,7 +117,6 @@ export const initSocket = (httpServer) => {
                     `[WS] Connected: ${user.name} (${user.role}) joined ${socket.rooms.size} rooms.`,
                 );
             }
-
         } catch (err) {
             console.error(
                 `[WS] Room subscription error for user ${user._id}:`,

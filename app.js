@@ -41,7 +41,7 @@ import AppError from "./src/utils/appError.js";
 import globalErrorHandler from "./src/utils/errorHandler.js";
 import sanitizer from "perfect-express-sanitizer";
 import toobusy from "toobusy-js";
-import { allowedOrigins } from "./src/config/corsConfig.js";
+import { allowedOrigins, corsOriginHandler } from "./src/config/corsConfig.js";
 
 import userRouter from "./src/modules/users/userRouter.js";
 import authRouter from "./src/modules/auth/authRouter.js";
@@ -112,16 +112,11 @@ app.use(function (req, res, next) {
 app.enable("trust proxy");
 
 // Enable CORS – allow frontend origin (localhost in dev, FRONTEND_URL in prod)
-// allowedOrigins is imported from src/config/corsConfig.js — single source of truth
+// corsOriginHandler is imported from src/config/corsConfig.js — single source of truth
 // shared with the Socket.io server (socketService.js).
 app.use(
     cors({
-        origin: (origin, cb) => {
-            if (!origin || allowedOrigins.includes(origin))
-                return cb(null, true);
-            if (process.env.NODE_ENV !== "production") return cb(null, true);
-            return cb(null, false);
-        },
+        origin: corsOriginHandler,
         credentials: true,
     }),
 );
@@ -175,7 +170,12 @@ app.use(
         sql: false,
         // CRIT-1: 'templateData' is whitelisted because fingerprint templates are base64-encoded.
         // Base64 chars (+, /, =) trigger XSS sanitization rules and silently corrupt binary data.
-        whitelist: ["password", "passwordConfirm", "currentPassword", "templateData"],
+        whitelist: [
+            "password",
+            "passwordConfirm",
+            "currentPassword",
+            "templateData",
+        ],
     }),
 );
 

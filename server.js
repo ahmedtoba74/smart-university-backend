@@ -3,6 +3,7 @@ import http from "http";
 import dbConnection from "./DB/dbConnection.js";
 import app from "./app.js";
 import { expireDueSessions } from "./src/utils/attendanceUtils.js";
+import { expireAnnouncements } from "./src/utils/announcementUtils.js";
 import { initSocket } from "./src/services/socketService.js";
 
 process.on("uncaughtException", (err) => {
@@ -40,11 +41,26 @@ server.listen(port, () => {
 // that have passed their expiresAt time and are still marked 'active'.
 // expireDueSessions transitions them to 'expired', clears device templates
 // (best-effort), and recalculates attendance for all enrolled students.
-const sessionCleanupInterval = setInterval(() => {
-    expireDueSessions().catch((err) =>
-        console.error('[SessionCleanup] Error:', err.message),
-    );
-}, 5 * 60 * 1000);
+const sessionCleanupInterval = setInterval(
+    () => {
+        expireDueSessions().catch((err) =>
+            console.error("[SessionCleanup] Error:", err.message),
+        );
+    },
+    5 * 60 * 1000,
+);
+
+// Phase 6 — Announcement expiry cleanup: runs every hour to soft-delete any
+// announcements whose optional expiresAt timestamp has passed.
+// Mirrors the session cleanup pattern — fire-and-forget with error logging.
+const announcementCleanupInterval = setInterval(
+    () => {
+        expireAnnouncements().catch((err) =>
+            console.error("[AnnouncementCleanup] Error:", err.message),
+        );
+    },
+    60 * 60 * 1000,
+); // 1 hour
 
 process.on("unhandledRejection", (err) => {
     console.error("Unhandled Rejection! Shutting down...");
@@ -57,6 +73,7 @@ process.on("unhandledRejection", (err) => {
 process.on("SIGTERM", () => {
     console.log("👋 SIGTERM RECEIVED. Shutting down gracefully");
     clearInterval(sessionCleanupInterval);
+    clearInterval(announcementCleanupInterval);
     server.close(() => {
         console.log("💥 Process terminated!");
     });

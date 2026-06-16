@@ -43,6 +43,14 @@ const announcementSchema = new mongoose.Schema(
             default: false,
             index: true,
         },
+        // Optional auto-expiry date. When set, the hourly cleanup job in server.js
+        // soft-deletes this announcement once the timestamp passes.
+        // Must be a future date at creation time (validated in the controller).
+        expiresAt: {
+            type: Date,
+            default: null,
+            index: true, // Indexed for efficient $lte cleanup queries
+        },
     },
     { timestamps: true },
 );

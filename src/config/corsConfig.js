@@ -15,3 +15,26 @@ export const allowedOrigins = [
 if (process.env.FRONTEND_URL) {
     allowedOrigins.push(process.env.FRONTEND_URL);
 }
+
+/**
+ * Shared CORS origin handler for both the Express HTTP server (app.js)
+ * and the Socket.io server (socketService.js).
+ *
+ * Behavior:
+ * - No Origin header (server-to-server, curl, Postman) → always allowed.
+ * - Any origin in non-production environments → allowed for local testing.
+ * - Production: allowed origins pass, all others are warned and rejected.
+ *   The warn (not throw) keeps the socket alive and avoids log spam from
+ *   legitimate browser preflight retries, while still providing audit visibility
+ *   into unauthorized probes.
+ */
+export const corsOriginHandler = (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    if (process.env.NODE_ENV !== "production") return cb(null, true);
+    // Warn instead of silently dropping — gives security audit visibility
+    // without crashing on unknown origins or polluting logs with full stack traces.
+    console.warn(
+        `[CORS] Blocked unauthorized origin: "${origin}" at ${new Date().toISOString()}`,
+    );
+    return cb(null, false);
+};

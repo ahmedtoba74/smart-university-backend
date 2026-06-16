@@ -1,5 +1,3 @@
-// src/modules/announcements/announcementController.js
-
 import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
 import Announcement from "../../../DB/models/announcementModel.js";
@@ -12,6 +10,7 @@ import {
     applyFieldsGuard,
 } from "../../utils/controllerUtils.js";
 import { broadcastAnnouncement } from "../../services/socketService.js";
+import { logAuditEvent } from "../../utils/auditLogger.js";
 
 // ===========================================
 // INTERNAL HELPER — VISIBILITY FILTER BUILDER
@@ -151,6 +150,38 @@ const buildVisibilityFilter = async (user) => {
 };
 
 // ===========================================
+// RESPONSE TRANSFORMER
+// ===========================================
+
+/**
+ * Transforms a populated Announcement document for the REST API response.
+ * Renames the populated 'author_id' field to 'author' so the REST shape
+ * matches the WebSocket 'new_announcement' payload consistently.
+ *
+ * If 'author_id' was not populated (e.g. excluded by a ?fields projection),
+ * the document is returned as-is without modification.
+ *
+ * IMPORTANT: Do NOT use this in deleteAnnouncement — that handler must compare
+ * announcement.author_id as an ObjectId, not a populated subdocument.
+ *
+ * @param {Object} doc - Mongoose document (has .toObject()) or plain object
+ * @returns {Object} Plain object with author field instead of author_id
+ */
+const toAnnouncementResponse = (doc) => {
+    const obj = doc.toObject ? doc.toObject() : { ...doc };
+    // Only rename when author_id is a populated subdocument (has .name set)
+    if (
+        obj.author_id &&
+        typeof obj.author_id === "object" &&
+        obj.author_id.name !== undefined
+    ) {
+        obj.author = obj.author_id;
+        delete obj.author_id;
+    }
+    return obj;
+};
+
+// ===========================================
 // CONTROLLERS
 // ===========================================
 
@@ -160,7 +191,7 @@ const buildVisibilityFilter = async (user) => {
  * Triggers a fire-and-forget WebSocket broadcast after successful DB write.
  */
 export const createAnnouncement = catchAsync(async (req, res, next) => {
-    const { title, content, scope } = req.body;
+    const { title, content, scope, expiresAt } = req.body;
 
     // --- 1. INPUT VALIDATION ---
     // Guard against missing or malformed scope before any ObjectId operations
@@ -171,6 +202,23 @@ export const createAnnouncement = catchAsync(async (req, res, next) => {
                 400,
             ),
         );
+    }
+
+    // Validate optional expiresAt — must be a valid future date if provided
+    let parsedExpiresAt;
+    if (expiresAt !== undefined) {
+        parsedExpiresAt = new Date(expiresAt);
+        if (isNaN(parsedExpiresAt.getTime())) {
+            return next(
+                new AppError(
+                    "expiresAt must be a valid ISO 8601 date string.",
+                    400,
+                ),
+            );
+        }
+        if (parsedExpiresAt <= new Date()) {
+            return next(new AppError("expiresAt must be a future date.", 400));
+        }
     }
 
     const { level } = scope;
@@ -345,9 +393,29 @@ export const createAnnouncement = catchAsync(async (req, res, next) => {
         content,
         author_id: req.user._id,
         scope: { level, target: uniqueTargets },
+        // expiresAt is undefined when not provided — Mongoose treats undefined as omitted
+        // so the schema default (null) is applied automatically
+        ...(parsedExpiresAt !== undefined && { expiresAt: parsedExpiresAt }),
     });
 
-    // --- 4. FIRE-AND-FORGET BROADCAST ---
+    // Populate author for response consistency with the WebSocket payload shape
+    await announcement.populate("author_id", "name role");
+
+    // --- 4. AUDIT LOG ---
+    logAuditEvent({
+        actor: req.user,
+        action: "ANNOUNCEMENT_CREATED",
+        resource: "Announcement",
+        resourceId: announcement._id,
+        ip: req.ip,
+        details: {
+            scope: { level, target: uniqueTargets },
+            title,
+            expiresAt: parsedExpiresAt ?? null,
+        },
+    });
+
+    // --- 5. FIRE-AND-FORGET BROADCAST ---
     // broadcastAnnouncement is async. A try/catch here would NOT catch its rejections.
     // The .catch() pattern absorbs async rejections without blocking the HTTP response.
     broadcastAnnouncement(announcement).catch((broadcastErr) => {
@@ -357,10 +425,10 @@ export const createAnnouncement = catchAsync(async (req, res, next) => {
         );
     });
 
-    // --- 5. HTTP RESPONSE ---
+    // --- 6. HTTP RESPONSE ---
     res.status(201).json({
         status: "success",
-        data: { announcement },
+        data: { announcement: toAnnouncementResponse(announcement) },
     });
 });
 
@@ -395,10 +463,12 @@ export const getAnnouncements = catchAsync(async (req, res, next) => {
         .limitFields()
         .paginate();
 
-    const [announcements, total] = await Promise.all([
-        features.query,
+    const [rawAnnouncements, total] = await Promise.all([
+        features.query.populate("author_id", "name role"),
         features.countTotal(Announcement, combinedFilter),
     ]);
+
+    const announcements = rawAnnouncements.map(toAnnouncementResponse);
 
     res.status(200).json({
         status: "success",
@@ -420,12 +490,23 @@ export const getAnnouncements = catchAsync(async (req, res, next) => {
 export const getAnnouncementById = catchAsync(async (req, res, next) => {
     const Filter = await buildVisibilityFilter(req.user);
 
-    // Single query: fetch only if within visibility boundary and not archived.
-    // Returns 404 for both non-existent AND out-of-scope documents.
+    // Admins (UA/CA) can retrieve archived announcements by ID for audit and investigation.
+    // Setting isArchived explicitly in the filter bypasses the pre-find hook which
+    // otherwise unconditionally adds { isArchived: false } when the field is absent.
+    // Non-admin roles always see only active announcements (hook default applies).
+    const isAdminRole = ["universityAdmin", "collegeAdmin"].includes(
+        req.user.role,
+    );
+    if (isAdminRole) {
+        Filter.isArchived = { $in: [true, false] };
+    }
+
+    // Single query: fetch only if within visibility boundary.
+    // Returns 404 for both non-existent AND out-of-scope documents (probing resistance).
     const announcement = await Announcement.findOne({
         _id: req.params.id,
         ...Filter,
-    });
+    }).populate("author_id", "name role");
 
     if (!announcement) {
         return next(new AppError("Announcement not found.", 404));
@@ -433,7 +514,7 @@ export const getAnnouncementById = catchAsync(async (req, res, next) => {
 
     res.status(200).json({
         status: "success",
-        data: { announcement },
+        data: { announcement: toAnnouncementResponse(announcement) },
     });
 });
 
@@ -527,6 +608,22 @@ export const deleteAnnouncement = catchAsync(async (req, res, next) => {
     announcement.isArchived = true;
     await announcement.save();
 
-    // --- 5. RESPONSE ---
+    // --- 5. AUDIT LOG ---
+    logAuditEvent({
+        actor: req.user,
+        action: "ANNOUNCEMENT_DELETED",
+        resource: "Announcement",
+        resourceId: announcement._id,
+        ip: req.ip,
+        details: {
+            scope: announcement.scope,
+            deletedBy: req.user.role,
+            // wasAuthor: true means the actor deleted their own announcement
+            // wasAuthor: false means a UA/CA used moderation authority
+            wasAuthor: isAuthor,
+        },
+    });
+
+    // --- 6. RESPONSE ---
     res.status(204).json({ status: "success", data: null });
 });
