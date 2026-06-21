@@ -62,17 +62,11 @@ const searchDocuments = {
             });
         }
 
-        // Embed the query using the Azure embedding model
-        // The embedding model is imported lazily to avoid circular dependency with chatService
-        const { AzureOpenAIEmbeddings } = await import("@langchain/openai");
-        const embeddingModel = new AzureOpenAIEmbeddings({
-            azureOpenAIApiKey: process.env.AZURE_OPENAI_API_KEY,
-            azureOpenAIApiDeploymentName:
-                process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
-            azureOpenAIApiEndpoint: process.env.AZURE_OPENAI_ENDPOINT,
-            azureOpenAIApiVersion: process.env.AZURE_OPENAI_API_VERSION,
-        });
-
+        // Reuse the embedding model singleton from chatService.
+        // Dynamic import is used here to avoid a load-time circular dependency:
+        // chatService.js -> chatTools.js -> ragTools.js -> chatService.js.
+        const { embeddingModel } =
+            await import("../../services/chatService.js");
         const queryEmbedding = await embeddingModel.embedQuery(input.query);
 
         // Vector search with defense-in-depth user_id filter

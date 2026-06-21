@@ -381,10 +381,11 @@ export const sendMessage = catchAsync(async (req, res, next) => {
     }
 
     // 1. Content validation
-    if (!req.body.content || req.body.content.trim().length === 0) {
+    const trimmedContent = req.body.content ? req.body.content.trim() : "";
+    if (trimmedContent.length === 0) {
         return next(new AppError("Message content cannot be empty.", 400));
     }
-    if (req.body.content.length > 4000) {
+    if (trimmedContent.length > 4000) {
         return next(
             new AppError("Message content cannot exceed 4000 characters.", 400),
         );
@@ -412,13 +413,13 @@ export const sendMessage = catchAsync(async (req, res, next) => {
         conversation_id: conversation._id,
         user_id: req.user._id,
         role: "user",
-        content: req.body.content,
+        content: trimmedContent,
         status: "pending",
     });
 
     // 4. Auto-title on first message
     if (conversation.messageCount === 0) {
-        conversation.title = req.body.content
+        conversation.title = trimmedContent
             .replace(/<[^>]*>/g, "") // Strip HTML tags (stored XSS defense)
             .slice(0, 60)
             .trim();
@@ -516,6 +517,7 @@ export const streamResponse = catchAsync(async (req, res, next) => {
 
     // Helper: send SSE error and close
     const sendSseError = (errorMsg) => {
+        streamAborted = true; // prevent req.on('close') from executing rollback
         res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`);
         res.end();
     };
@@ -558,6 +560,7 @@ export const streamResponse = catchAsync(async (req, res, next) => {
 
         if (streamAborted) return;
         clearTimeout(sseTimeout);
+        streamAborted = true; // prevent req.on('close') from executing rollback
 
         // 7. Save assistant message
         const assistantMsg = await Message.create({
@@ -594,19 +597,22 @@ export const streamResponse = catchAsync(async (req, res, next) => {
             { upsert: true, new: true },
         );
 
-        // 11. Soft warning at 80% budget
+        // 11. Soft warning at 80% budget (Independent settings fetch)
+        const settings = await getSettingsCache();
+        const roleLimit =
+            settings.chatTokenLimitByRole?.[req.user.role] ?? 50000;
+
         let finalResponse = agentResult.response;
-        if (req.chatRoleLimit && req.chatRoleLimit > 0) {
+        if (roleLimit && roleLimit > 0) {
             const updatedUsage = await ChatUsage.findOne({
                 user_id: req.user._id,
                 monthYear: currentMonthYear,
             });
             if (updatedUsage) {
-                const pct =
-                    updatedUsage.tokensUsedThisMonth / req.chatRoleLimit;
+                const pct = updatedUsage.tokensUsedThisMonth / roleLimit;
                 if (pct >= 0.8) {
                     const remaining =
-                        req.chatRoleLimit - updatedUsage.tokensUsedThisMonth;
+                        roleLimit - updatedUsage.tokensUsedThisMonth;
                     finalResponse += `\n\n---\n⚠️ You've used over 80% of your monthly AI usage budget. Approximately ${remaining} tokens remaining this month.`;
                     // Update assistant message with warning appended
                     await Message.updateOne(

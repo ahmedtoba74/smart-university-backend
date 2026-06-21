@@ -71,7 +71,7 @@ const getCollegeOfferings = {
             .select(
                 "course_id semester academicYear doctors_ids tas_ids maxSeats currentEnrolled resultsPublished semesterWorkLocked",
             )
-            .populate("course_id", "courseCode courseTitle creditHours")
+            .populate("course_id", "code title creditHours")
             .lean();
 
         return JSON.stringify({
@@ -118,7 +118,9 @@ const getCollegeUsers = {
         }
 
         const users = await User.find(filter)
-            .select("name email role department_id level gpa academicStatus photo createdAt")
+            .select(
+                "name email role department_id level gpa academicStatus photo createdAt",
+            )
             .limit(input.limit)
             .lean();
 
@@ -147,7 +149,7 @@ const getCollegeEnrollmentStats = {
         const matchFilter = {};
         if (userContext.scopeFilter?.college_id) {
             matchFilter.college_id = new mongoose.Types.ObjectId(
-                userContext.scopeFilter.college_id
+                userContext.scopeFilter.college_id,
             );
         }
 
@@ -268,7 +270,7 @@ const getFingerprintEnrollmentStatus = {
                 .select("_id name email")
                 .lean(),
             FingerprintTemplate.find({
-                college_id: userContext.user.college_id,
+                ...userContext.scopeFilter,
                 isActive: true,
             })
                 .select("student_id quality enrolledViaDevice createdAt")

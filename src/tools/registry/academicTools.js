@@ -35,6 +35,7 @@ import CourseOffering from "../../../DB/models/courseOfferingModel.js";
 import CourseCatalog from "../../../DB/models/courseCatalogModel.js";
 import Assessment from "../../../DB/models/assessmentModel.js";
 import Submission from "../../../DB/models/submissionModel.js";
+import Settings from "../../../DB/models/settingsModel.js";
 
 // ===================================================================================
 // TOOL: getMyEnrollments
@@ -283,9 +284,7 @@ const getAvailableCourses = {
         "Returns course offerings available for enrollment in the current semester within the student's college. Includes course name, code, credit hours, available seats, and schedule. Use this when the user asks about available courses, what they can enroll in, or course schedules.",
     schema: z.object({}),
     execute: async (_input, userContext) => {
-        const settings = await import(
-            "../../../DB/models/settingsModel.js"
-        ).then((m) => m.default.getSettings());
+        const settings = await Settings.getSettings();
 
         const filter = {
             ...userContext.scopeFilter,
@@ -297,10 +296,7 @@ const getAvailableCourses = {
             .select(
                 "course_id semester academicYear maxSeats currentEnrolled schedule totalDegree gradingPolicy",
             )
-            .populate(
-                "course_id",
-                "courseCode courseTitle creditHours department_id",
-            )
+            .populate("course_id", "code title creditHours department_id")
             .lean();
 
         return JSON.stringify({

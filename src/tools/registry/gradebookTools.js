@@ -76,7 +76,7 @@ const getMyCourseOfferings = {
             .select(
                 "course_id semester academicYear maxSeats currentEnrolled schedule resultsPublished semesterWorkLocked",
             )
-            .populate("course_id", "courseCode courseTitle creditHours")
+            .populate("course_id", "code title creditHours")
             .lean();
 
         return JSON.stringify({
@@ -119,7 +119,9 @@ const getCourseGradebook = {
             course_id: input.courseOfferingId,
             status: { $ne: "withdrawn" },
         })
-            .select("student_id snapshot grades status finalAttendancePercentage")
+            .select(
+                "student_id snapshot grades status finalAttendancePercentage",
+            )
             .populate("student_id", "name email")
             .lean();
 

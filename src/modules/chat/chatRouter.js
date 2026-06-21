@@ -22,6 +22,7 @@ import {
 import { enforcePasswordChange } from "../../middlewares/enforcePasswordChange.js";
 import { checkTokenBudget } from "../../middlewares/chatMiddleware.js";
 import * as chatController from "./chatController.js";
+import AppError from "../../utils/appError.js";
 
 const router = express.Router();
 
@@ -45,9 +46,9 @@ const chatUpload = multer({
             cb(null, true);
         } else {
             cb(
-                new Error(
+                new AppError(
                     "Only PDF and plain text files are supported for chat attachments.",
-                    400,
+                    415,
                 ),
                 false,
             );
@@ -55,7 +56,29 @@ const chatUpload = multer({
     },
 });
 
+// Custom wrapper to format Multer upload errors
+const handleChatUpload = (req, res, next) => {
+    chatUpload.single("file")(req, res, (err) => {
+        if (err) {
+            if (err instanceof multer.MulterError) {
+                if (err.code === "LIMIT_FILE_SIZE") {
+                    return next(
+                        new AppError(
+                            "File too large. Maximum size is 10MB.",
+                            413,
+                        ),
+                    );
+                }
+                return next(new AppError(err.message, 400));
+            }
+            return next(err);
+        }
+        next();
+    });
+};
+
 // ── Conversation management ──────────────────────────────────────────────────
+// ...
 router.post("/conversations", chatController.createConversation);
 router.get("/conversations", chatController.listConversations);
 router.get("/conversations/:id", chatController.getConversation);
@@ -79,7 +102,7 @@ router.get("/conversations/:id/stream", chatController.streamResponse);
 // Magic byte validation happens in the controller after this Multer check
 router.post(
     "/conversations/:id/upload",
-    chatUpload.single("file"),
+    handleChatUpload,
     chatController.uploadRagFile,
 );
 

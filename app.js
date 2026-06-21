@@ -76,11 +76,11 @@ const requiredEnvVars = [
     // IOT_HUB_CONNECTION_STRING is intentionally NOT here — optional when IOT_MOCK_MODE=true.
     "IOT_DEVICE_SECRET",
     // Phase 7 — Azure OpenAI (fail fast — no runtime fallback)
-    // "AZURE_OPENAI_API_KEY",
-    // "AZURE_OPENAI_ENDPOINT",
-    // "AZURE_OPENAI_DEPLOYMENT_NAME",
-    // "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
-    // "AZURE_OPENAI_API_VERSION",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_OPENAI_ENDPOINT",
+    "AZURE_OPENAI_DEPLOYMENT_NAME",
+    "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
+    "AZURE_OPENAI_API_VERSION",
 ];
 
 const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
