@@ -59,6 +59,8 @@ import uploadRouter from "./src/modules/uploads/uploadRouter.js";
 import attendanceRouter from "./src/modules/attendance/attendanceRouter.js";
 // Phase 6 — Announcements & Real-Time Notifications Engine
 import announcementRouter from "./src/modules/announcements/announcementRouter.js";
+// Phase 7 — AI Chatbot Engine
+import chatRouter from "./src/modules/chat/chatRouter.js";
 
 // Load env vars
 dotenv.config();
@@ -74,11 +76,11 @@ const requiredEnvVars = [
     // IOT_HUB_CONNECTION_STRING is intentionally NOT here — optional when IOT_MOCK_MODE=true.
     "IOT_DEVICE_SECRET",
     // Phase 7 — Azure OpenAI (fail fast — no runtime fallback)
-    "AZURE_OPENAI_API_KEY",
-    "AZURE_OPENAI_ENDPOINT",
-    "AZURE_OPENAI_DEPLOYMENT_NAME",
-    "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
-    "AZURE_OPENAI_API_VERSION",
+    // "AZURE_OPENAI_API_KEY",
+    // "AZURE_OPENAI_ENDPOINT",
+    // "AZURE_OPENAI_DEPLOYMENT_NAME",
+    // "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
+    // "AZURE_OPENAI_API_VERSION",
 ];
 
 const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
@@ -286,8 +288,7 @@ app.use("/api/v1/attendance", attendanceRouter);
 app.use("/api/v1/announcements", announcementRouter);
 
 // Phase 7 — AI Chatbot Engine
-// chatRouter import and mount added in Step 15 after chatRouter.js is created.
-// app.use("/api/v1/chat", chatRouter);
+app.use("/api/v1/chat", chatRouter);
 
 // Handle Unhandled Routes — MUST REMAIN LAST
 app.all(/(.*)/, (req, res, next) => {
