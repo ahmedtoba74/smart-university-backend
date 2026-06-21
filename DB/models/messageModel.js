@@ -110,14 +110,14 @@ const messageSchema = new mongoose.Schema(
          */
         status: {
             type: String,
-            enum: ["pending", "processing", "completed"],
+            enum: ["pending", "processing", "completed", "failed"],
             default: "pending",
             index: true,
         },
     },
     {
         timestamps: { createdAt: true, updatedAt: false },
-    }
+    },
 );
 
 // Indexes

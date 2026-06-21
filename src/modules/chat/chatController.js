@@ -15,7 +15,7 @@
 
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+const { PDFParse } = require("pdf-parse");
 
 import mongoose from "mongoose";
 import catchAsync from "../../utils/catchAsync.js";
@@ -467,6 +467,21 @@ export const streamResponse = catchAsync(async (req, res, next) => {
         return next(new AppError("Conversation not found.", 404));
     }
 
+    // 1.5. Self-Healing: Clean up any stale processing messages for this conversation.
+    // Maximum stream timeout is 120 seconds; any message stuck in 'processing' for over 5 minutes is stale.
+    // Since messageSchema only defines 'createdAt' (updatedAt: false), we query using createdAt.
+    const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+    const staleTime = new Date(Date.now() - STALE_THRESHOLD_MS);
+
+    await Message.updateMany(
+        {
+            conversation_id: conversation._id,
+            status: "processing",
+            createdAt: { $lt: staleTime },
+        },
+        { $set: { status: "failed" } },
+    );
+
     // Check if a stream is already in progress for this conversation
     const activeStream = await Message.findOne({
         conversation_id: conversation._id,
@@ -515,15 +530,31 @@ export const streamResponse = catchAsync(async (req, res, next) => {
         }
     };
 
-    // Helper: send SSE error and close
+    // Helper: mark user message 'failed' on post-stream failure
+    const failMessage = async () => {
+        try {
+            await Message.updateOne(
+                { _id: pendingMessage._id },
+                { $set: { status: "failed" } },
+            );
+        } catch (e) {
+            console.error(
+                "[streamResponse] Failed to mark message status as failed:",
+                e.message,
+            );
+        }
+    };
+
+    // Pure Helper: send SSE error and close (separation of responsibilities)
     const sendSseError = (errorMsg) => {
-        streamAborted = true; // prevent req.on('close') from executing rollback
         res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`);
         res.end();
     };
 
     // 4. 120-second timeout
     let streamAborted = false;
+    let agentCompleted = false; // Flag to indicate agent has finished generating response
+
     const sseTimeout = setTimeout(async () => {
         streamAborted = true;
         await rollbackMessage();
@@ -532,7 +563,8 @@ export const streamResponse = catchAsync(async (req, res, next) => {
 
     // 5. Disconnect handler
     req.on("close", async () => {
-        if (streamAborted) return;
+        // If the client aborted or the agent already finished and is saving, do nothing
+        if (streamAborted || agentCompleted) return;
         streamAborted = true;
         clearTimeout(sseTimeout);
         await rollbackMessage();
@@ -560,74 +592,82 @@ export const streamResponse = catchAsync(async (req, res, next) => {
 
         if (streamAborted) return;
         clearTimeout(sseTimeout);
-        streamAborted = true; // prevent req.on('close') from executing rollback
+        agentCompleted = true; // Agent completed successfully; block close handler rollback
 
-        // 7. Save assistant message
-        const assistantMsg = await Message.create({
-            conversation_id: conversation._id,
-            user_id: req.user._id,
-            role: "assistant",
-            content: agentResult.response,
-            toolsInvoked: agentResult.toolsInvoked,
-            pillarUsed: agentResult.pillarUsed,
-            tokensUsed: agentResult.tokensUsed,
-            status: "completed",
-        });
+        let assistantMsgId;
 
-        // 8. Mark user message completed
-        await Message.updateOne(
-            { _id: pendingMessage._id },
-            { $set: { status: "completed" } },
-        );
+        // 7. Save assistant message and update stats atomically using a MongoDB transaction
+        const session = await mongoose.startSession();
+        try {
+            await session.withTransaction(async () => {
+                // 10. Update chat usage
+                const currentMonthYear = new Date().toISOString().slice(0, 7);
+                const tokensToAdd = agentResult.tokensUsed?.total ?? 0;
 
-        // 9. Update conversation stats
-        conversation.messageCount += 1;
-        conversation.totalTokensUsed += agentResult.tokensUsed?.total ?? 0;
-        await conversation.save();
+                const updatedUsage = await ChatUsage.findOneAndUpdate(
+                    { user_id: req.user._id, monthYear: currentMonthYear },
+                    {
+                        $inc: { tokensUsedThisMonth: tokensToAdd },
+                        $set: { lastUpdatedAt: new Date() },
+                    },
+                    { upsert: true, new: true, session },
+                );
 
-        // 10. Update chat usage
-        const currentMonthYear = new Date().toISOString().slice(0, 7);
-        const tokensToAdd = agentResult.tokensUsed?.total ?? 0;
-        await ChatUsage.findOneAndUpdate(
-            { user_id: req.user._id, monthYear: currentMonthYear },
-            {
-                $inc: { tokensUsedThisMonth: tokensToAdd },
-                $set: { lastUpdatedAt: new Date() },
-            },
-            { upsert: true, new: true },
-        );
+                // 11. Soft warning at 80% budget (Independent settings fetch)
+                const settings = await getSettingsCache();
+                const roleLimit =
+                    settings.chatTokenLimitByRole?.[req.user.role] ?? 50000;
 
-        // 11. Soft warning at 80% budget (Independent settings fetch)
-        const settings = await getSettingsCache();
-        const roleLimit =
-            settings.chatTokenLimitByRole?.[req.user.role] ?? 50000;
-
-        let finalResponse = agentResult.response;
-        if (roleLimit && roleLimit > 0) {
-            const updatedUsage = await ChatUsage.findOne({
-                user_id: req.user._id,
-                monthYear: currentMonthYear,
-            });
-            if (updatedUsage) {
-                const pct = updatedUsage.tokensUsedThisMonth / roleLimit;
-                if (pct >= 0.8) {
-                    const remaining =
-                        roleLimit - updatedUsage.tokensUsedThisMonth;
-                    finalResponse += `\n\n---\n⚠️ You've used over 80% of your monthly AI usage budget. Approximately ${remaining} tokens remaining this month.`;
-                    // Update assistant message with warning appended
-                    await Message.updateOne(
-                        { _id: assistantMsg._id },
-                        { $set: { content: finalResponse } },
-                    );
+                let finalResponse = agentResult.response;
+                if (roleLimit && roleLimit > 0 && updatedUsage) {
+                    const pct = updatedUsage.tokensUsedThisMonth / roleLimit;
+                    if (pct >= 0.8) {
+                        const remaining =
+                            roleLimit - updatedUsage.tokensUsedThisMonth;
+                        finalResponse += `\n\n---\n⚠️ You've used over 80% of your monthly AI usage budget. Approximately ${remaining} tokens remaining this month.`;
+                    }
                 }
-            }
+
+                // 7. Save assistant message (with warning already integrated)
+                const [assistantMsg] = await Message.create(
+                    [
+                        {
+                            conversation_id: conversation._id,
+                            user_id: req.user._id,
+                            role: "assistant",
+                            content: finalResponse,
+                            toolsInvoked: agentResult.toolsInvoked,
+                            pillarUsed: agentResult.pillarUsed,
+                            tokensUsed: agentResult.tokensUsed,
+                            status: "completed",
+                        },
+                    ],
+                    { session },
+                );
+
+                // 8. Mark user message completed
+                await Message.updateOne(
+                    { _id: pendingMessage._id },
+                    { $set: { status: "completed" } },
+                    { session },
+                );
+
+                // 9. Update conversation stats
+                conversation.messageCount += 1;
+                conversation.totalTokensUsed += tokensToAdd;
+                await conversation.save({ session });
+
+                assistantMsgId = assistantMsg._id;
+            });
+        } finally {
+            await session.endSession();
         }
 
         // 12. Send done event
         res.write(
             `data: ${JSON.stringify({
                 done: true,
-                messageId: assistantMsg._id,
+                messageId: assistantMsgId,
                 toolsInvoked: agentResult.toolsInvoked,
             })}\n\n`,
         );
@@ -656,8 +696,17 @@ export const streamResponse = catchAsync(async (req, res, next) => {
                 "The AI service took too long to respond. Please try again.";
         }
 
-        console.error("[streamResponse] Agent error:", err.message);
-        await rollbackMessage();
+        console.error("[streamResponse] Agent or save error:", err.message);
+
+        // If the agent already successfully completed, any failure is a post-generation DB failure.
+        // We transition the user message status directly to 'failed' instead of rolling back to 'pending'.
+        if (agentCompleted) {
+            await failMessage();
+        } else {
+            agentCompleted = true; // Prevent close listener from executing secondary rollback
+            await rollbackMessage();
+        }
+
         sendSseError(userMessage);
     }
 });
@@ -763,11 +812,18 @@ export const uploadRagFile = catchAsync(async (req, res, next) => {
     // 4. Text extraction
     let text = "";
     if (req.file.mimetype === "application/pdf") {
+        let parser;
         try {
-            const parsed = await pdfParse(req.file.buffer);
+            parser = new PDFParse({ data: req.file.buffer });
+            const parsed = await parser.getText();
             text = parsed.text || "";
         } catch (err) {
+            console.error("[uploadRagFile] PDF parsing error:", err);
             return next(new AppError("Failed to parse PDF file content.", 400));
+        } finally {
+            if (parser) {
+                await parser.destroy().catch(() => {});
+            }
         }
     } else if (req.file.mimetype === "text/plain") {
         text = req.file.buffer.toString("utf-8");

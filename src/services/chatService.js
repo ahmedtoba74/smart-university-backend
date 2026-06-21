@@ -54,12 +54,27 @@ const chatModel = new AzureChatOpenAI({
     streamUsage: true, // Required to get token counts in stream chunks
 });
 
+let azureInstanceName = "";
+if (process.env.AZURE_OPENAI_ENDPOINT) {
+    try {
+        azureInstanceName = new URL(
+            process.env.AZURE_OPENAI_ENDPOINT,
+        ).hostname.split(".")[0];
+    } catch (e) {
+        console.error(
+            "[chatService] Invalid AZURE_OPENAI_ENDPOINT:",
+            e.message,
+        );
+    }
+}
+
 /**
  * Azure OpenAI Embeddings Model used for document chunking and query RAG retrieval.
  */
 export const embeddingModel = new AzureOpenAIEmbeddings({
     azureOpenAIApiKey: process.env.AZURE_OPENAI_API_KEY,
     azureOpenAIApiEndpoint: process.env.AZURE_OPENAI_ENDPOINT,
+    azureOpenAIApiInstanceName: azureInstanceName || undefined,
     azureOpenAIApiDeploymentName:
         process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT ??
         "text-embedding-3-small",

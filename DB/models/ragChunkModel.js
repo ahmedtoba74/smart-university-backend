@@ -104,7 +104,7 @@ const ragChunkSchema = new mongoose.Schema(
     },
     {
         timestamps: true,
-    }
+    },
 );
 
 // Indexes
