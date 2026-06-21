@@ -50,6 +50,10 @@ const ALLOWED_UPDATE_FIELDS = [
     "defaultCreditLimit",
     "gradeThresholds",
     "levelThresholds",
+    "chatTokenLimitByRole",
+    "chatHistoryLimit",
+    "chatMaxContextTokens",
+    "chatMaxSummarizationCycles",
 ];
 
 /**

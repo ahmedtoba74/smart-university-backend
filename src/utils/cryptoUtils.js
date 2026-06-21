@@ -1,16 +1,18 @@
-import crypto from 'crypto';
-import dotenv from 'dotenv';
+import crypto from "crypto";
+import dotenv from "dotenv";
 dotenv.config();
 
-const ALGORITHM = process.env.ENCRYPTION_ALGORITHM || 'aes-256-cbc';
+const ALGORITHM = process.env.ENCRYPTION_ALGORITHM || "aes-256-cbc";
 
-const IV_LENGTH = process.env.ENCRYPTION_IV_LENGTH || 16; 
+const IV_LENGTH = parseInt(process.env.ENCRYPTION_IV_LENGTH, 10) || 16;
 
 if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length !== 32) {
-    throw new Error('FATAL ERROR: ENCRYPTION_KEY must be exactly 32 characters long.');
+    throw new Error(
+        "FATAL ERROR: ENCRYPTION_KEY must be exactly 32 characters long.",
+    );
 }
 if (!process.env.HASH_SECRET) {
-    throw new Error('FATAL ERROR: HASH_SECRET is missing from env variables.');
+    throw new Error("FATAL ERROR: HASH_SECRET is missing from env variables.");
 }
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
@@ -24,15 +26,19 @@ const HASH_SECRET = process.env.HASH_SECRET;
  */
 export const encrypt = (text) => {
     if (!text) return null;
-    
+
     let iv = crypto.randomBytes(IV_LENGTH);
-    
-    let cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY), iv);
-    
+
+    let cipher = crypto.createCipheriv(
+        ALGORITHM,
+        Buffer.from(ENCRYPTION_KEY),
+        iv,
+    );
+
     let encrypted = cipher.update(text);
     encrypted = Buffer.concat([encrypted, cipher.final()]);
-    
-    return iv.toString('hex') + ':' + encrypted.toString('hex');
+
+    return iv.toString("hex") + ":" + encrypted.toString("hex");
 };
 
 /**
@@ -45,15 +51,19 @@ export const decrypt = (text) => {
     if (!text) return null;
 
     try {
-        let textParts = text.split(':');
-        let iv = Buffer.from(textParts.shift(), 'hex');
-        let encryptedText = Buffer.from(textParts.join(':'), 'hex');
-        
-        let decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY), iv);
-        
+        let textParts = text.split(":");
+        let iv = Buffer.from(textParts.shift(), "hex");
+        let encryptedText = Buffer.from(textParts.join(":"), "hex");
+
+        let decipher = crypto.createDecipheriv(
+            ALGORITHM,
+            Buffer.from(ENCRYPTION_KEY),
+            iv,
+        );
+
         let decrypted = decipher.update(encryptedText);
         decrypted = Buffer.concat([decrypted, decipher.final()]);
-        
+
         return decrypted.toString();
     } catch (error) {
         console.error("Decryption Error:", error.message);
@@ -71,9 +81,9 @@ export const hashForSearch = (text) => {
     if (!text) return null;
 
     return crypto
-        .createHash('sha256')
+        .createHash("sha256")
         .update(text + HASH_SECRET)
-        .digest('hex');
+        .digest("hex");
 };
 
 /**
@@ -88,26 +98,28 @@ export const encryptBulkPassword = (plaintext, secret) => {
     if (!plaintext || !secret) return null;
 
     try {
-        const algorithm = 'aes-256-gcm';
+        const algorithm = "aes-256-gcm";
         const iv = crypto.randomBytes(16);
-        
+
         // Derive a proper 32-byte key from secret if needed
         let key;
         if (Buffer.byteLength(secret) === 32) {
             key = Buffer.from(secret);
         } else {
-            key = crypto.createHash('sha256').update(secret).digest();
+            key = crypto.createHash("sha256").update(secret).digest();
         }
 
         const cipher = crypto.createCipheriv(algorithm, key, iv);
-        let encrypted = cipher.update(plaintext, 'utf8', 'hex');
-        encrypted += cipher.final('hex');
-        
+        let encrypted = cipher.update(plaintext, "utf8", "hex");
+        encrypted += cipher.final("hex");
+
         const authTag = cipher.getAuthTag();
 
-        return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
+        return (
+            iv.toString("hex") + ":" + authTag.toString("hex") + ":" + encrypted
+        );
     } catch (error) {
-        console.error('Encryption error:', error.message);
+        console.error("Encryption error:", error.message);
         return null;
     }
 };
@@ -123,16 +135,16 @@ export const decryptBulkPassword = (ciphertext, secret) => {
     if (!ciphertext || !secret) return null;
 
     try {
-        const algorithm = 'aes-256-gcm';
-        const parts = ciphertext.split(':');
-        
+        const algorithm = "aes-256-gcm";
+        const parts = ciphertext.split(":");
+
         if (parts.length !== 3) {
-            console.error('Invalid ciphertext format');
+            console.error("Invalid ciphertext format");
             return null;
         }
 
-        const iv = Buffer.from(parts[0], 'hex');
-        const authTag = Buffer.from(parts[1], 'hex');
+        const iv = Buffer.from(parts[0], "hex");
+        const authTag = Buffer.from(parts[1], "hex");
         const encrypted = parts[2];
 
         // Derive key same way as encrypt
@@ -140,18 +152,18 @@ export const decryptBulkPassword = (ciphertext, secret) => {
         if (Buffer.byteLength(secret) === 32) {
             key = Buffer.from(secret);
         } else {
-            key = crypto.createHash('sha256').update(secret).digest();
+            key = crypto.createHash("sha256").update(secret).digest();
         }
 
         const decipher = crypto.createDecipheriv(algorithm, key, iv);
         decipher.setAuthTag(authTag);
-        
-        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-        decrypted += decipher.final('utf8');
+
+        let decrypted = decipher.update(encrypted, "hex", "utf8");
+        decrypted += decipher.final("utf8");
 
         return decrypted;
     } catch (error) {
-        console.error('Decryption error:', error.message);
+        console.error("Decryption error:", error.message);
         return null;
     }
 };
@@ -180,13 +192,16 @@ export const encryptFingerprintTemplate = (templateBuffer) => {
     // 12-byte IV is the NIST recommended length for AES-GCM (96-bit nonce)
     const iv = crypto.randomBytes(12);
     const key = Buffer.from(ENCRYPTION_KEY);
-    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-    const encrypted = Buffer.concat([cipher.update(templateBuffer), cipher.final()]);
+    const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+    const encrypted = Buffer.concat([
+        cipher.update(templateBuffer),
+        cipher.final(),
+    ]);
     const authTag = cipher.getAuthTag();
     return {
-        ciphertext: encrypted.toString('base64'),
-        iv: iv.toString('hex'),
-        authTag: authTag.toString('hex'),
+        ciphertext: encrypted.toString("base64"),
+        iv: iv.toString("hex"),
+        authTag: authTag.toString("hex"),
     };
 };
 
@@ -204,13 +219,13 @@ export const encryptFingerprintTemplate = (templateBuffer) => {
 export const decryptFingerprintTemplate = ({ ciphertext, iv, authTag }) => {
     const key = Buffer.from(ENCRYPTION_KEY);
     const decipher = crypto.createDecipheriv(
-        'aes-256-gcm',
+        "aes-256-gcm",
         key,
-        Buffer.from(iv, 'hex'),
+        Buffer.from(iv, "hex"),
     );
-    decipher.setAuthTag(Buffer.from(authTag, 'hex'));
+    decipher.setAuthTag(Buffer.from(authTag, "hex"));
     return Buffer.concat([
-        decipher.update(Buffer.from(ciphertext, 'base64')),
+        decipher.update(Buffer.from(ciphertext, "base64")),
         decipher.final(),
     ]);
-};
+};

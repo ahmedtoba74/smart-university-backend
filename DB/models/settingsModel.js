@@ -222,6 +222,53 @@ const settingsSchema = new mongoose.Schema(
                 default: 21,
             },
         },
+
+        /**
+         * @field chatTokenLimitByRole — Monthly token budget per role in tokens.
+         * universityAdmin: 0 = unlimited (enforced in checkTokenBudget middleware).
+         * All values are in tokens as reported by Azure API (prompt + completion combined).
+         * Configurable by universityAdmin via PATCH /api/v1/settings.
+         */
+        chatTokenLimitByRole: {
+            student:         { type: Number, default: 50000  },
+            ta:              { type: Number, default: 100000 },
+            doctor:          { type: Number, default: 100000 },
+            collegeAdmin:    { type: Number, default: 200000 },
+            universityAdmin: { type: Number, default: 0      }, // 0 = unlimited
+        },
+
+        /**
+         * @field chatHistoryLimit — Max conversations retained per user (sliding window).
+         * When a new conversation is created and this limit is exceeded, the oldest
+         * conversation (by createdAt) and all its associated data are hard-deleted atomically.
+         * Configurable by universityAdmin via PATCH /api/v1/settings.
+         */
+        chatHistoryLimit: {
+            type: Number,
+            default: 20,
+        },
+
+        /**
+         * @field chatMaxContextTokens — Token count threshold that triggers conversation
+         * history summarization. Calculated as the sum of (content.length / 4) across
+         * all recent messages. When this approaches 80% of the threshold, the chat service
+         * summarizes older messages before sending to the AI. Operates independently of
+         * the monthly token budget.
+         */
+        chatMaxContextTokens: {
+            type: Number,
+            default: 8000,
+        },
+
+        /**
+         * @field chatMaxSummarizationCycles — Maximum number of summarization cycles
+         * allowed in a single conversation. When this limit is reached, the conversation
+         * is sealed (isSealed: true) and the user must start a new chat.
+         */
+        chatMaxSummarizationCycles: {
+            type: Number,
+            default: 3,
+        },
     },
     {
         timestamps: true,

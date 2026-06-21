@@ -73,6 +73,10 @@ const requiredEnvVars = [
     // Phase 5 — IoT device shared secret is required at startup (BE-CRIT-4).
     // IOT_HUB_CONNECTION_STRING is intentionally NOT here — optional when IOT_MOCK_MODE=true.
     "IOT_DEVICE_SECRET",
+    // Phase 7 — Azure OpenAI (fail fast — no runtime fallback)
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_OPENAI_ENDPOINT",
+    "AZURE_OPENAI_DEPLOYMENT_NAME",
 ];
 
 const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
@@ -148,7 +152,19 @@ const limiter = rateLimit({
             "/api/v1/attendance/fingerprints/register",
             "/api/v1/attendance/devices/heartbeat",
         ];
-        return iotPaths.some((p) => req.originalUrl.startsWith(p));
+        // Existing IoT exemption (unchanged)
+        if (iotPaths.some((p) => req.originalUrl.startsWith(p))) return true;
+        // Phase 7 — Exempt SSE stream from rate limiter.
+        // Token budget system already prevents abuse. Long-lived SSE connections
+        // would exhaust the 100-req/10min limit for legitimate chat users.
+        if (
+            req.originalUrl.match(
+                /\/api\/v1\/chat\/conversations\/[^/]+\/stream$/,
+            )
+        ) {
+            return true;
+        }
+        return false;
     },
 });
 
@@ -175,6 +191,7 @@ app.use(
             "passwordConfirm",
             "currentPassword",
             "templateData",
+            "content", // Phase 7 — Chat message content must not be XSS-sanitized server-side
         ],
     }),
 );
@@ -182,8 +199,19 @@ app.use(
 // Prevent HTTP Parameter Pollution
 app.use(hpp());
 
-// Compress text responses
-app.use(compression());
+// GAP-6 (Phase 7): Filter SSE responses from compression.
+// SSE streams require unbuffered chunked output — gzip buffering breaks real-time
+// token-by-token delivery. All other REST API responses continue to be compressed.
+app.use(
+    compression({
+        filter: (req, res) => {
+            if (res.getHeader("Content-Type") === "text/event-stream") {
+                return false;
+            }
+            return compression.filter(req, res);
+        },
+    }),
+);
 
 // Parse cookies
 app.use(cookieParser());
@@ -254,6 +282,10 @@ app.use("/api/v1/attendance", attendanceRouter);
 
 // Phase 6 — Announcements & Real-Time Notifications Engine
 app.use("/api/v1/announcements", announcementRouter);
+
+// Phase 7 — AI Chatbot Engine
+// chatRouter import and mount added in Step 15 after chatRouter.js is created.
+// app.use("/api/v1/chat", chatRouter);
 
 // Handle Unhandled Routes — MUST REMAIN LAST
 app.all(/(.*)/, (req, res, next) => {
