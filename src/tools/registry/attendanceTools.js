@@ -2,23 +2,17 @@
  * ===================================================================================
  * @file      attendanceTools.js
  * @desc      Attendance tools — loaded for 'student', 'doctor', and 'ta' roles.
- *
  *            Provides two perspectives on attendance data:
- *              - getMyAttendance    : Student's own attendance for a specific course
- *              - getSessionReport   : Doctor/TA present/absent breakdown for a session
- *
+ *            - getMyAttendance    : Student's own attendance for a specific course
+ *            - getSessionReport   : Doctor/TA present/absent breakdown for a session
  *            Both tools enforce strict IDOR boundaries:
- *              - getMyAttendance uses student_id: userContext.user._id
- *              - getSessionReport verifies the doctor/TA is assigned to the offering
- *                before returning session data
- *
- * @module    src/tools/registry/attendanceTools
- * @requires  zod
- * @requires  ../../../DB/models/attendanceRecordModel
- * @requires  ../../../DB/models/attendanceSessionModel
- * @requires  ../../../DB/models/enrollmentModel
- * @requires  ../../../DB/models/courseOfferingModel
+ *            - getMyAttendance uses student_id: userContext.user._id
+ *            - getSessionReport verifies the doctor/TA is assigned to the offering
+ *            before returning session data
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/tools/registry/attendanceTools
  */
 
 import { z } from "zod";

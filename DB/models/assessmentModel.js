@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      assessmentModel.js
+ * @desc      Mongoose schema and model definition for Assessments (Assignments, Quizzes, Exams) with custom pre-save validation hooks.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    DB/Models/Assessment
+ */
+
 import mongoose from "mongoose";
 
 /**

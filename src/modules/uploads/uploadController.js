@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      uploadController.js
+ * @desc      Controller for handling Media Uploads API operations.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Media Uploads/Controller
+ */
+
 // uploadController.js
 import { uploadToCloudinary } from "../../utils/uploadHelper.js";
 import catchAsync from "../../utils/catchAsync.js";

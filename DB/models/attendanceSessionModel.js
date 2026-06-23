@@ -4,9 +4,10 @@
  * @desc      Mongoose model for a single attendance session tied to a course offering.
  *            Manages the full lifecycle: active → expired | ended. Supports fingerprint
  *            device template mapping, QR fallback tokens, and hall-switch audit trail.
- * @module    DB/models/attendanceSessionModel
- * @requires  mongoose
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    DB/models/attendanceSessionModel
  */
 
 import mongoose from "mongoose";

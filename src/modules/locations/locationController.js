@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      locationController.js
+ * @desc      Controller for handling Campus Locations API operations.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Campus Locations/Controller
+ */
+
 import Location from "../../../DB/models/locationModel.js";
 import College from "../../../DB/models/collegeModel.js";
 import APIFeatures from "../../utils/apiFeatures.js";

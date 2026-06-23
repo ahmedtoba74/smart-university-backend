@@ -3,9 +3,10 @@
  * @file      materialRouter.js
  * @desc      Router for course material management endpoints.
  *            Nested under /api/v1/offerings/:offeringId/materials
- * @module    modules/material/materialRouter
- * @requires  express, authMiddleware, materialController
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    modules/material/materialRouter
  */
 
 import express from "express";

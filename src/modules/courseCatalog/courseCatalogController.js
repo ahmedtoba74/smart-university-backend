@@ -7,6 +7,7 @@
  * @author    Ahmed Toba
  * @version   1.0.0
  * ===================================================================================
+ * @module    Modules/Course Catalog/Controller
  */
 
 import catchAsync from "../../utils/catchAsync.js";

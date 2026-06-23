@@ -1,12 +1,12 @@
 /**
  * ===================================================================================
- * @project   Smart University Platform
  * @file      userModel.js
  * @desc      Mongoose model for User entity. Handles identity, authentication,
- * encryption (Blind Indexing), RBAC, and security policies (Lockout, 2FA).
- * @author    Ahmed Toba <ahmed.toba.mahmoud@gmail.com>
+ *            encryption (Blind Indexing), RBAC, and security policies (Lockout, 2FA).
+ * @author    Ahmed Toba
  * @version   1.0.0
  * ===================================================================================
+ * @module    DB/Models/User
  */
 
 import mongoose from "mongoose";

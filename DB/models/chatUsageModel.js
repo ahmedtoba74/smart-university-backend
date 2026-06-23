@@ -6,9 +6,10 @@
  *            The unique compound index { user_id, monthYear } enables atomic upsert
  *            from the checkTokenBudget middleware. Counters reset by writing a new
  *            monthYear value — no cron job required.
- * @module    DB/models/chatUsageModel
- * @requires  mongoose
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    DB/models/chatUsageModel
  */
 
 import mongoose from "mongoose";

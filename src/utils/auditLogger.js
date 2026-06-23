@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      auditLogger.js
+ * @desc      Utility for logging system events and administrative operations for compliance audits.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Utils/AuditLogger
+ */
+
 // src/utils/auditLogger.js
 // Structured audit logger for security-sensitive events in the Smart University Platform.
 // Outputs newline-delimited JSON to stdout so log aggregators (CloudWatch, Azure Monitor,

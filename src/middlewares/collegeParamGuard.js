@@ -1,12 +1,12 @@
 /**
  * ===================================================================================
- * @project   Smart University Platform
  * @file      collegeParamGuard.js
  * @desc      Middleware to securely lock college Admins to their scope in nested routes
- * and prevent IDOR via 404 responses.
- * @author    Ahmed Toba <ahmed.toba.mahmoud@gmail.com>
+ *            and prevent IDOR via 404 responses.
+ * @author    Ahmed Toba
  * @version   1.0.0
  * ===================================================================================
+ * @module    Middlewares/CollegeGuard
  */
 import AppError from "../utils/appError.js";
 

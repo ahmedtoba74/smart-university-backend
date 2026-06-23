@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      userController.js
+ * @desc      Controller for handling Users Management API operations.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Users Management/Controller
+ */
+
 import User from "../../../DB/models/userModel.js";
 import College from "../../../DB/models/collegeModel.js";
 import BulkImportLog from "../../../DB/models/bulkImportLogModel.js";

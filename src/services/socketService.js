@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      socketService.js
+ * @desc      Socket.io service for handling real-time notifications and device heartbeats.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Services/Socket
+ */
+
 // src/services/socketService.js
 // Real-time WebSocket engine for the Smart University Platform.
 // Implements room-based subscriptions and fire-and-forget announcement broadcasts.

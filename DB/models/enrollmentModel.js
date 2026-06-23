@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      enrollmentModel.js
+ * @desc      Mongoose schema and model definition for Enrollments, managing student registrations, grades, and GPA calculations.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    DB/Models/Enrollment
+ */
+
 import mongoose from "mongoose";
 
 /**

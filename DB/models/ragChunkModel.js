@@ -7,9 +7,10 @@
  *            deleted via cascade when the parent conversation is deleted.
  *            NO TTL index: time-based expiry would break RAG mid-conversation.
  *            The vector search index must be created manually in MongoDB Atlas.
- * @module    DB/models/ragChunkModel
- * @requires  mongoose
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    DB/models/ragChunkModel
  */
 
 /**

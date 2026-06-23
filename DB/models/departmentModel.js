@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      departmentModel.js
+ * @desc      Mongoose schema and model definition for Departments, defining specific fields of study within colleges.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    DB/Models/Department
+ */
+
 import mongoose from "mongoose";
 
 const departmentSchema = new mongoose.Schema(

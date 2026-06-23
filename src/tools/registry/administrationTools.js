@@ -2,28 +2,20 @@
  * ===================================================================================
  * @file      administrationTools.js
  * @desc      Tier 4 administration tools — loaded for the 'collegeAdmin' role only.
- *
  *            Contains:
- *              - getCollegeOfferings          : All course offerings for the college
- *              - getCollegeUsers              : Users in the college (optional role filter)
- *              - getCollegeEnrollmentStats    : Enrollment counts by offering
- *              - getCollegeDepartments        : Departments in the college
- *              - getCollegeLocations          : Physical locations in the college
- *              - getFingerprintEnrollmentStatus: Students with/without fingerprint templates
- *
+ *            - getCollegeOfferings          : All course offerings for the college
+ *            - getCollegeUsers              : Users in the college (optional role filter)
+ *            - getCollegeEnrollmentStats    : Enrollment counts by offering
+ *            - getCollegeDepartments        : Departments in the college
+ *            - getCollegeLocations          : Physical locations in the college
+ *            - getFingerprintEnrollmentStatus: Students with/without fingerprint templates
  *            All tools use scopeFilter (which contains { college_id: admin.college_id })
  *            injected by attachCollegeScope middleware. collegeAdmin scopeFilter
  *            is always college-scoped — cross-college queries are impossible.
- *
- * @module    src/tools/registry/administrationTools
- * @requires  zod
- * @requires  ../../../DB/models/courseOfferingModel
- * @requires  ../../../DB/models/userModel
- * @requires  ../../../DB/models/enrollmentModel
- * @requires  ../../../DB/models/departmentModel
- * @requires  ../../../DB/models/locationModel
- * @requires  ../../../DB/models/fingerprintTemplateModel
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/tools/registry/administrationTools
  */
 
 import mongoose from "mongoose";

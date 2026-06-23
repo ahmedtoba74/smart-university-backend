@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      settingsModel.js
+ * @desc      Mongoose schema and model definition for global System Settings (singleton).
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    DB/Models/Settings
+ */
+
 import mongoose from "mongoose";
 
 /**

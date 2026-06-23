@@ -2,26 +2,19 @@
  * ===================================================================================
  * @file      gradebookTools.js
  * @desc      Tier 3 gradebook tools — loaded for 'doctor' and 'ta' roles only.
- *
  *            Contains:
- *              - getMyCourseOfferings        : Offerings where user is doctor or TA
- *              - getCourseGradebook          : All student grades for an assigned offering
- *              - getOfferingStudents         : Enrolled students for an assigned offering
- *              - getCourseAssessments        : Assessments for an assigned offering
- *              - getSubmissionsForAssessment : Student submissions for an assessment
- *
+ *            - getMyCourseOfferings        : Offerings where user is doctor or TA
+ *            - getCourseGradebook          : All student grades for an assigned offering
+ *            - getOfferingStudents         : Enrolled students for an assigned offering
+ *            - getCourseAssessments        : Assessments for an assigned offering
+ *            - getSubmissionsForAssessment : Student submissions for an assessment
  *            All tools enforce offering ownership: before returning any data,
  *            they verify the requesting user is in doctors_ids or tas_ids for
  *            the target CourseOffering. This prevents cross-course data access.
- *
- * @module    src/tools/registry/gradebookTools
- * @requires  zod
- * @requires  ../../../DB/models/courseOfferingModel
- * @requires  ../../../DB/models/enrollmentModel
- * @requires  ../../../DB/models/userModel
- * @requires  ../../../DB/models/assessmentModel
- * @requires  ../../../DB/models/submissionModel
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/tools/registry/gradebookTools
  */
 
 import { z } from "zod";

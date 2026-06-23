@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      announcementRouter.js
+ * @desc      Router defining API endpoints for Announcements.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Announcements/Router
+ */
+
 // src/modules/announcements/announcementRouter.js
 
 import express from "express";

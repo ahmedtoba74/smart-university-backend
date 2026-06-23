@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      authMiddleware.js
+ * @desc      Express middleware for authentication, JWT verification, and role authorization.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Middlewares/Auth
+ */
+
 import { promisify } from "util";
 import jwt from "jsonwebtoken";
 import User from "../../DB/models/userModel.js";

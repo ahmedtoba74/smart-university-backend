@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      controllerUtils.js
+ * @desc      Generic helper functions for standard REST API controller responses.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Utils/Controller
+ */
+
 import mongoose from "mongoose";
 import AppError from "./appError.js";
 

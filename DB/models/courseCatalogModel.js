@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      courseCatalogModel.js
+ * @desc      Mongoose schema and model definition for the Course Catalog, storing static course details, pre-requisites, and credits.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    DB/Models/CourseCatalog
+ */
+
 import mongoose from "mongoose";
 
 const courseCatalogSchema = new mongoose.Schema(

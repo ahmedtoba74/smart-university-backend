@@ -3,9 +3,10 @@
  * @file      submissionRouter.js
  * @desc      Router for submission management endpoints (student answers, grading).
  *            Base path: /api/v1/submissions (NOT nested)
- * @module    modules/submission/submissionRouter
- * @requires  express, authMiddleware, submissionController
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    modules/submission/submissionRouter
  */
 
 import express from "express";

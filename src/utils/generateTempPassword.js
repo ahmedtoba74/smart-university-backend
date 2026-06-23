@@ -1,11 +1,11 @@
 /**
  * ===================================================================================
- * @project   Smart University Platform
  * @file      generateTempPassword.js
  * @desc      Utility for generating cryptographically secure temporary passwords.
- * @author    Ahmed Toba <ahmed.toba.mahmoud@gmail.com>
+ * @author    Ahmed Toba
  * @version   1.0.0
  * ===================================================================================
+ * @module    Utils/GenerateTempPassword
  */
 import crypto from "crypto";
 

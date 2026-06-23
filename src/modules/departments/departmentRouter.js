@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      departmentRouter.js
+ * @desc      Router defining API endpoints for Departments.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Departments/Router
+ */
+
 import express from "express";
 import * as departmentController from "./departmentController.js";
 import {

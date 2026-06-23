@@ -7,10 +7,10 @@
  *            Two-step message flow: POST /messages (Step 1) → GET /stream (Step 2).
  *            SSE error handling uses a dedicated try/catch after header flush —
  *            the global error handler CANNOT be used post-flush (ERR_HTTP_HEADERS_SENT).
- * @module    src/modules/chat/chatController
- * @requires  catchAsync, AppError, Conversation, Message, RagChunk, ChatUsage,
- *            Settings, chatService, uploadHelper
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/modules/chat/chatController
  */
 
 import { createRequire } from "module";

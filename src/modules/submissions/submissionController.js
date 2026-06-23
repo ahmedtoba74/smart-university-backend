@@ -3,11 +3,10 @@
  * @file      submissionController.js
  * @desc      Controller for submission management (student answers, grading workflow).
  *            Handles draft saves, auto-grading, manual grading, and timer enforcement.
- * @module    modules/submission/submissionController
- * @requires  Submission, Assessment, Enrollment models, gradeUtils
- * @audit     D-4: Timer expiry handling with force-submit
- *            D-23: Triggers recalculateAssignmentGrade after grading
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    modules/submission/submissionController
  */
 
 import Submission from "../../../DB/models/submissionModel.js";

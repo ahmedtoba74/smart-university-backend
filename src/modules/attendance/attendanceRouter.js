@@ -3,14 +3,14 @@
  * @file      attendanceRouter.js
  * @desc      Express router for the Phase 5 Fingerprint Attendance System.
  *            Two authentication categories:
- *              1. JWT routes (doctor/ta/student/collegeAdmin):
- *                 protect → enforcePasswordChange → restrictTo → attachCollegeScope → handler
- *              2. IoT device routes (ESP32 hardware):
- *                 authenticateDevice only — NO protect, NO enforcePasswordChange
- * @module    src/modules/attendance/attendanceRouter
- * @requires  express, authMiddleware, enforcePasswordChange, attendanceMiddleware,
- *            attendanceController
+ *            1. JWT routes (doctor/ta/student/collegeAdmin):
+ *            protect → enforcePasswordChange → restrictTo → attachCollegeScope → handler
+ *            2. IoT device routes (ESP32 hardware):
+ *            authenticateDevice only — NO protect, NO enforcePasswordChange
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/modules/attendance/attendanceRouter
  */
 
 import express from "express";

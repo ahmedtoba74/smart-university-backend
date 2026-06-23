@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      collegeController.js
+ * @desc      Controller for handling Colleges API operations.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Colleges/Controller
+ */
+
 import College from "../../../DB/models/collegeModel.js";
 import Department from "../../../DB/models/departmentModel.js";
 import User from "../../../DB/models/userModel.js";

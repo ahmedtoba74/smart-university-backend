@@ -6,9 +6,10 @@
  *            pending (Step 1 saved) → processing (Step 2 claimed) → completed (done).
  *            The 4000-character content limit applies only to user-submitted messages
  *            and is enforced at the controller layer, NOT at the schema level.
- * @module    DB/models/messageModel
- * @requires  mongoose
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    DB/models/messageModel
  */
 
 import mongoose from "mongoose";

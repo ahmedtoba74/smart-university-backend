@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      errorHandler.js
+ * @desc      Global Express error handling middleware formatting operational and programming errors.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Utils/ErrorHandler
+ */
+
 import AppError from "./appError.js";
 import multer from "multer";
 

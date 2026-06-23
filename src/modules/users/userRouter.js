@@ -1,12 +1,12 @@
 /**
  * ===================================================================================
- * @project   Smart University Platform
  * @file      userRouter.js
  * @desc      Express router for the Users module containing nested route structures,
- * strict ordering for static/dynamic routes, and parameter interceptors.
- * @author    Ahmed Toba <ahmed.toba.mahmoud@gmail.com>
+ *            strict ordering for static/dynamic routes, and parameter interceptors.
+ * @author    Ahmed Toba
  * @version   1.0.0
  * ===================================================================================
+ * @module    Modules/Users Management/Router
  */
 import express from "express";
 import * as userController from "./userController.js";

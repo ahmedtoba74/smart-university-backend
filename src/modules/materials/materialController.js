@@ -3,9 +3,10 @@
  * @file      materialController.js
  * @desc      Controller for course material management (CRUD operations).
  *            Handles file uploads, external links, and ownership-based permissions.
- * @module    modules/material/materialController
- * @requires  Material, CourseOffering models, catchAsync, AppError
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    modules/material/materialController
  */
 
 import Material from "../../../DB/models/materialModel.js";

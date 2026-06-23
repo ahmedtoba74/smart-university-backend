@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      authController.js
+ * @desc      Controller for handling Authentication API operations.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Authentication/Controller
+ */
+
 import User from "../../../DB/models/userModel.js";
 import BulkImportLog from "../../../DB/models/bulkImportLogModel.js";
 import catchAsync from "../../utils/catchAsync.js";

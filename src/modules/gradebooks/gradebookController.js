@@ -3,15 +3,10 @@
  * @file      gradebookController.js
  * @desc      Controller for gradebook management and GPA calculation.
  *            Handles semester work entry, locking, final exam entry, and publishing.
- * @module    modules/gradebook/gradebookController
- * @requires  Enrollment, CourseOffering, User, Settings, Assessment, Submission models
- * @audit     D-12: Absolute rebuild pattern for GPA/credits
- *            D-13: Level promotion based on earnedCredits
- *            D-14: Dynamic grade thresholds (no hardcoded values)
- *            D-25: Concurrent publish warning documented
- *            D-26: No college_id filter for GPA (single university)
- *            D-27: UniversityAdmin unlock safety valve
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    modules/gradebook/gradebookController
  */
 
 import Enrollment from "../../../DB/models/enrollmentModel.js";

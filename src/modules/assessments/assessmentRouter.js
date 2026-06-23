@@ -3,9 +3,10 @@
  * @file      assessmentRouter.js
  * @desc      Router for assessment management endpoints (quizzes, exams, assignments).
  *            Nested under /api/v1/offerings/:offeringId/assessments
- * @module    modules/assessment/assessmentRouter
- * @requires  express, authMiddleware, assessmentController
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    modules/assessment/assessmentRouter
  */
 
 import express from "express";

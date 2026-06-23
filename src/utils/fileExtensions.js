@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      fileExtensions.js
+ * @desc      Helper mapping MIME types to file extensions.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Utils/FileExtensions
+ */
+
 export const fileValidation = {
     // 1. (Images)
     image: [

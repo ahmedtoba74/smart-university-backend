@@ -5,10 +5,11 @@
  *            checkTokenBudget: runs ONLY on POST /messages (Step 1 of the two-step
  *            flow). Enforces monthly token limits per role, resets counters on new
  *            calendar month, and attaches usage data to req for post-stream updating.
- *            universityAdmin has unlimited access (limit === 0).
- * @module    src/middlewares/chatMiddleware
- * @requires  Settings, ChatUsage, catchAsync, AppError
+ *            universityAdmin has unlimited access (limit
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/middlewares/chatMiddleware
  */
 
 import { getSettingsCache } from "../modules/settings/settingsController.js";

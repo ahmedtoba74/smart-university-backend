@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      validationUtils.js
+ * @desc      Express validator checks and schemas for incoming payloads.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Utils/Validation
+ */
+
 import { z } from "zod";
 
 /**

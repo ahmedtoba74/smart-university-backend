@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      collegeRouter.js
+ * @desc      Router defining API endpoints for Colleges.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Colleges/Router
+ */
+
 import express from "express";
 import * as collegeController from "./collegeController.js";
 import * as departmentController from "../departments/departmentController.js";

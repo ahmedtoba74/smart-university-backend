@@ -5,9 +5,10 @@
  *            one conversation thread per user. Conversations are hard-deleted (not
  *            soft-deleted) — no isArchived field or pre-find hook is defined.
  *            Cascade deletion (messages + RAG chunks) is handled in chatController.js.
- * @module    DB/models/conversationModel
- * @requires  mongoose
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    DB/models/conversationModel
  */
 
 import mongoose from "mongoose";

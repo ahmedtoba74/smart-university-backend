@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      announcementController.js
+ * @desc      Controller for handling Announcements API operations.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Announcements/Controller
+ */
+
 import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
 import Announcement from "../../../DB/models/announcementModel.js";

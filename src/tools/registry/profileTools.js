@@ -3,18 +3,15 @@
  * @file      profileTools.js
  * @desc      Tier 1 profile tools — available to all authenticated roles.
  *            Contains getSystemInfo and getMyProfile.
- *
  *            getMyProfile uses an explicit .select() projection to return
  *            only safe, non-sensitive user fields. The raw userContext.user
  *            object is NEVER returned — it contains security fields such as
  *            loginAttempts, lockoutStage, lockUntil, twoFactorSecret,
  *            and passwordResetToken.
- *
- * @module    src/tools/registry/profileTools
- * @requires  zod
- * @requires  ../../../DB/models/settingsModel
- * @requires  ../../../DB/models/userModel
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/tools/registry/profileTools
  */
 
 import { z } from "zod";

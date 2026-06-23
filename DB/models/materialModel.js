@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      materialModel.js
+ * @desc      Mongoose schema and model definition for course Materials, including slides, links, and documents.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    DB/Models/Material
+ */
+
 import mongoose from "mongoose";
 
 /**

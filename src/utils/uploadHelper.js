@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      uploadHelper.js
+ * @desc      General upload processing and format checker.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Utils/UploadHelper
+ */
+
 import cloudinary from "./cloudinary.js";
 import { nanoid } from "nanoid";
 

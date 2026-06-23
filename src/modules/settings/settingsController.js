@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      settingsController.js
+ * @desc      Controller for handling Settings API operations.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Settings/Controller
+ */
+
 import Settings from "../../../DB/models/settingsModel.js";
 import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";

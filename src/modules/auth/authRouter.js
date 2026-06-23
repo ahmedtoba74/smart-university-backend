@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      authRouter.js
+ * @desc      Router defining API endpoints for Authentication.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Authentication/Router
+ */
+
 import express from "express";
 import * as authController from "./authController.js";
 

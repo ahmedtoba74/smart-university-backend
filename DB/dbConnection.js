@@ -1,5 +1,23 @@
+/**
+ * ===================================================================================
+ * @file      dbConnection.js
+ * @desc      Database connection setup. Resolves the database URI and establishes connection via Mongoose. Handles dropping of legacy indexes.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    DB/Connection
+ */
+
 import mongoose from "mongoose";
 
+/**
+ * Connects to MongoDB database using the URI defined in environment variables.
+ * Also performs startup checks and drops legacy indexes (e.g., AttendanceSession expiry).
+ *
+ * @async
+ * @function dbConnection
+ * @returns {Promise<typeof import("mongoose")>} Resolves to the mongoose instance on success.
+ */
 const dbConnection = async () => {
     const uri =
         process.env.MONGO_URI ||

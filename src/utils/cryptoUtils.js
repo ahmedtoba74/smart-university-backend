@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      cryptoUtils.js
+ * @desc      Cryptographic utilities for password hashing, encrypting templates, and signature verification.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Utils/Crypto
+ */
+
 import crypto from "crypto";
 import dotenv from "dotenv";
 dotenv.config();

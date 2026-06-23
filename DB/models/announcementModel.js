@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      announcementModel.js
+ * @desc      Mongoose schema and model definition for Announcements. Includes scope enforcement and query middleware for archiving.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    DB/Models/Announcement
+ */
+
 import mongoose from "mongoose";
 
 const announcementSchema = new mongoose.Schema(

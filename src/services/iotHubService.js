@@ -6,9 +6,10 @@
  *            and clear device templates after a session ends.
  *            When IOT_MOCK_MODE=true or IOT_HUB_CONNECTION_STRING is absent, all
  *            methods return mock success stubs — full local testing without Azure.
- * @module    src/services/iotHubService
- * @requires  module (createRequire), cryptoUtils
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/services/iotHubService
  */
 
 import { createRequire } from 'module';

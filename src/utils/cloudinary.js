@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      cloudinary.js
+ * @desc      Cloudinary integration for uploading and deleting media assets.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Utils/Cloudinary
+ */
+
 import { v2 as cloudinary } from "cloudinary";
 import dotenv from "dotenv";
 

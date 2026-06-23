@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      courseOfferingRouter.js
+ * @desc      Router defining API endpoints for Course Offerings.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Course Offerings/Router
+ */
+
 import express from "express";
 import * as courseOfferingController from "./courseOfferingController.js";
 import {

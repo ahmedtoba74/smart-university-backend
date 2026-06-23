@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      collegeModel.js
+ * @desc      Mongoose schema and model definition for Colleges, structuring academic faculties.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    DB/Models/College
+ */
+
 import mongoose from "mongoose";
 
 const collegeSchema = new mongoose.Schema(

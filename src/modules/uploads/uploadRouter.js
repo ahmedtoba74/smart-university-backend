@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      uploadRouter.js
+ * @desc      Router defining API endpoints for Media Uploads.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Media Uploads/Router
+ */
+
 // uploadRouter.js
 import express from "express";
 import { protect } from "../../middlewares/authMiddleware.js";

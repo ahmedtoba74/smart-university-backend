@@ -2,30 +2,19 @@
  * ===================================================================================
  * @file      academicTools.js
  * @desc      Tier 2 student academic record tools — loaded for the 'student' role only.
- *
  *            Contains:
- *              - getMyEnrollments    : Current and historical enrollments
- *              - getMyGrades         : Grades per enrollment with resultsPublished guard
- *              - getMyAssessments    : Assessments for enrolled courses with submission status
- *              - getMySubmission     : A specific submission with showGradesImmediately guard
- *              - getAvailableCourses : Course offerings available in the student's college
- *
+ *            - getMyEnrollments    : Current and historical enrollments
+ *            - getMyGrades         : Grades per enrollment with resultsPublished guard
+ *            - getMyAssessments    : Assessments for enrolled courses with submission status
+ *            - getMySubmission     : A specific submission with showGradesImmediately guard
+ *            - getAvailableCourses : Course offerings available in the student's college
  *            Business Rules Enforced:
- *              - getMyGrades: Never exposes finalTotal / finalLetter when the
- *                parent CourseOffering.resultsPublished === false. This mirrors
- *                the Phase 5 gradebook controller exactly.
- *              - getMySubmission: Strips answers[].score and totalScore when
- *                Assessment.settings.showGradesImmediately === false.
- *                This mirrors the Phase 5 submission controller exactly.
- *
- * @module    src/tools/registry/academicTools
- * @requires  zod
- * @requires  ../../../DB/models/enrollmentModel
- * @requires  ../../../DB/models/courseOfferingModel
- * @requires  ../../../DB/models/courseCatalogModel
- * @requires  ../../../DB/models/assessmentModel
- * @requires  ../../../DB/models/submissionModel
+ *            - getMyGrades: Never exposes finalTotal / finalLetter when the
+ *            parent CourseOffering.resultsPublished
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/tools/registry/academicTools
  */
 
 import { z } from "zod";

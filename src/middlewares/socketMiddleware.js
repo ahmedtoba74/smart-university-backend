@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      socketMiddleware.js
+ * @desc      Middleware for Socket.io authentication and room authorization.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Middlewares/Socket
+ */
+
 import { promisify } from "util";
 import jwt from "jsonwebtoken";
 import User from "../../DB/models/userModel.js";

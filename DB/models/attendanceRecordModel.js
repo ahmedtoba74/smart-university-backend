@@ -5,9 +5,10 @@
  *            Tracks the source of attendance (fingerprint, QR, manual override),
  *            device metadata, biometric confidence score, offline sync identifiers,
  *            and override audit trail.
- * @module    DB/models/attendanceRecordModel
- * @requires  mongoose
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    DB/models/attendanceRecordModel
  */
 
 import mongoose from "mongoose";

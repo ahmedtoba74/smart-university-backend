@@ -7,10 +7,10 @@
  *            The SSE stream endpoint (GET /stream) does NOT run checkTokenBudget —
  *            budget was already validated in Step 1.
  *            Multer config: PDF + text/plain only, 10MB max.
- * @module    src/modules/chat/chatRouter
- * @requires  express, authMiddleware, enforcePasswordChange, chatMiddleware,
- *            multer, chatController
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/modules/chat/chatRouter
  */
 
 import express from "express";

@@ -1,12 +1,12 @@
 /**
  * ===================================================================================
- * @project   Smart University Platform
  * @file      enforcePasswordChange.js
  * @desc      Globally applied middleware to reject requests from users needing to
- * update temporary passwords, maintaining an open emergency exit (Logout).
- * @author    Ahmed Toba <ahmed.toba.mahmoud@gmail.com>
+ *            update temporary passwords, maintaining an open emergency exit (Logout).
+ * @author    Ahmed Toba
  * @version   1.0.0
  * ===================================================================================
+ * @module    Middlewares/EnforcePasswordChange
  */
 import AppError from "../utils/appError.js";
 

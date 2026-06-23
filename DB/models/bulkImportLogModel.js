@@ -1,12 +1,12 @@
 /**
  * ===================================================================================
- * @project   Smart University Platform
  * @file      bulkImportLogModel.js
  * @desc      Mongoose model for tracking bulk import operations. Enables asynchronous
- * credentials resending, error tracking, and AES-encrypted temporary passwords.
- * @author    Ahmed Toba <ahmed.toba.mahmoud@gmail.com>
+ *            credentials resending, error tracking, and AES-encrypted temporary passwords.
+ * @author    Ahmed Toba
  * @version   1.0.0
  * ===================================================================================
+ * @module    DB/Models/BulkImportLog
  */
 import mongoose from "mongoose";
 

@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      courseOfferingModel.js
+ * @desc      Mongoose schema and model definition for Course Offerings, representing active course instances, schedules, and instructors.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    DB/Models/CourseOffering
+ */
+
 import mongoose from "mongoose";
 
 const courseOfferingSchema = new mongoose.Schema(

@@ -5,9 +5,10 @@
  *            Created by POST /attendance/fingerprints/enroll-mode. The ESP32 device
  *            must echo the nonce in /fingerprints/register to bind the hardware event
  *            to the admin action that initiated it (GAP-12, D-14).
- * @module    DB/models/fingerprintEnrollmentRequestModel
- * @requires  mongoose
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    DB/models/fingerprintEnrollmentRequestModel
  */
 
 import mongoose from "mongoose";

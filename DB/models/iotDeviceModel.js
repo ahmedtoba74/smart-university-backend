@@ -6,9 +6,10 @@
  *            binding, location binding, online/active state, firmware version, and
  *            heartbeat diagnostics. Used by triggerEnrollMode to resolve the correct
  *            enrollment station and by deviceHeartbeat to track device health (GAP-13).
- * @module    DB/models/iotDeviceModel
- * @requires  mongoose
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    DB/models/iotDeviceModel
  */
 
 import mongoose from "mongoose";

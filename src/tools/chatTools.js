@@ -6,38 +6,26 @@
  *            appropriate category modules for the given role and returns a flat
  *            array of LangChain DynamicStructuredTool instances with userContext
  *            bound to each tool's execute function.
- *
  *            Category loading order:
- *              Tier 1 (all roles):           profileTools, announcementTools, ragTools*
- *              Tier 2 (student):             + academicTools, attendanceTools
- *              Tier 3 (doctor / ta):         + attendanceTools, gradebookTools
- *              Tier 4 (collegeAdmin):        + administrationTools
- *              Tier 5 (universityAdmin):     + systemTools
- *
+ *            Tier 1 (all roles):           profileTools, announcementTools, ragTools*
+ *            Tier 2 (student):             + academicTools, attendanceTools
+ *            Tier 3 (doctor / ta):         + attendanceTools, gradebookTools
+ *            Tier 4 (collegeAdmin):        + administrationTools
+ *            Tier 5 (universityAdmin):     + systemTools
  *            *ragTools is conditionally included based on conversation.hasRagContext.
- *             Pass hasRagContext: true in the userContext options to enable it.
- *
+ *            Pass hasRagContext: true in the userContext options to enable it.
  *            Security invariant:
- *              userContext ({ user, scopeFilter, conversationId }) is always injected
- *              server-side. Tools NEVER accept role, college_id, or user identity
- *              from the LLM's input parameters — only from userContext.
- *
+ *            userContext ({ user, scopeFilter, conversationId }) is always injected
+ *            server-side. Tools NEVER accept role, college_id, or user identity
+ *            from the LLM's input parameters — only from userContext.
  *            Scalability:
- *              - Adding a new tool: add it to the appropriate category file only.
- *              - Adding a new category: create a new file, add one push() here.
- *              - Neither change affects existing categories or their tests.
- *
- * @module    src/tools/chatTools
- * @requires  @langchain/core/tools
- * @requires  ./registry/profileTools
- * @requires  ./registry/announcementTools
- * @requires  ./registry/ragTools
- * @requires  ./registry/academicTools
- * @requires  ./registry/attendanceTools
- * @requires  ./registry/gradebookTools
- * @requires  ./registry/administrationTools
- * @requires  ./registry/systemTools
+ *            - Adding a new tool: add it to the appropriate category file only.
+ *            - Adding a new category: create a new file, add one push() here.
+ *            - Neither change affects existing categories or their tests.
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/tools/chatTools
  */
 
 import { DynamicStructuredTool } from "@langchain/core/tools";

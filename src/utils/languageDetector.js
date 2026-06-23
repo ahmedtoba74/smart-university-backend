@@ -6,9 +6,10 @@
  *            language instruction into the system prompt, ensuring the AI responds
  *            in the user's language while preserving technical terms and course codes.
  *            Uses franc-min v6+ which is ESM-native — no createRequire needed.
- * @module    src/utils/languageDetector
- * @requires  franc-min
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/utils/languageDetector
  */
 
 import { franc } from "franc-min";

@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      locationModel.js
+ * @desc      Mongoose schema and model definition for Locations, describing classrooms, halls, and capacity ceilings.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    DB/Models/Location
+ */
+
 import mongoose from "mongoose";
 
 const locationSchema = new mongoose.Schema(

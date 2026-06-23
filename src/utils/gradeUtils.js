@@ -2,13 +2,11 @@
  * ===================================================================================
  * @file      gradeUtils.js
  * @desc      Grade calculation utilities for LMS & Gradebook system.
- * Provides score-to-letter mapping and assignment grade aggregation.
- * @module    utils/gradeUtils
- * @requires  mongoose, Submission model
- * @audit     LOW-1: totalDegree <= 0 guard in mapScoreToLetter
- * D-8: Accumulator pattern for assignment grades (NO percentage ratios)
- * D-23: Self-healing race window documented in recalculateAssignmentGrade
+ *            Provides score-to-letter mapping and assignment grade aggregation.
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    utils/gradeUtils
  */
 
 import Submission from "../../DB/models/submissionModel.js";

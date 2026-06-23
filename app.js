@@ -1,29 +1,13 @@
 /**
  * ===================================================================================
- * @project   Smart University Platform
- * "Forging a Secure and Resilient Digital Backbone for a New Era of Academia"
- * ===================================================================================
  * @file      app.js
  * @desc      The core application configuration and middleware setup.
- * This Backend API serves as the central nervous system for the platform,
- * integrating Authentication, Academic Management, LMS, and IoT Attendance.
+ *            This Backend API serves as the central nervous system for the platform,
+ *            integrating Authentication, Academic Management, LMS, and IoT Attendance.
+ * @author    Ahmed Toba
  * @version   1.0.0
- * @date      2025-2026
- * @author    Ahmed Toba <ahmed.toba.mahmoud@gmail.com> | Team Lead
- * @team      Graduation Project Team - Faculty of Engineering, Beni-Suef University
- * - Ahmed Toba (Backend)
- * - Mahmoud Ahmed (Frontend)
- * - Ahmed Shaban (Penetration Testing)
- * - Rana Tamer (DevOps)
- * - Hadeer Naser (DevOps)
- * - Mahmoud Saleh (Network)
- * - Adham Mahmoud (Network)
- * @supervisors
- * - Asst. Prof. Dr. Fathy El-Messiri
- * - Dr. Mohamed Faysel El-Rawy
- * @license   Proprietary - All Rights Reserved to Beni-Suef University
- * @repository https://github.com/ahmedtoba74/smart-university-backend
  * ===================================================================================
+ * @module    Modules/app
  */
 
 import express from "express";

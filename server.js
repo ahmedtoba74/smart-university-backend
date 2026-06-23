@@ -1,3 +1,15 @@
+/**
+ * ===================================================================================
+ * @file      server.js
+ * @desc      The entry point for the Smart University Platform Backend API.
+ *            Configures the HTTP server, initializes WebSockets, connects to the database,
+ *            and sets up recurring background tasks (session and announcement cleanups).
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Server
+ */
+
 import dotenv from "dotenv";
 import http from "http";
 import dbConnection from "./DB/dbConnection.js";

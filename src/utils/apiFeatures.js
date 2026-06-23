@@ -1,4 +1,14 @@
 /**
+ * ===================================================================================
+ * @file      apiFeatures.js
+ * @desc      Helper class for implementing pagination, filtering, sorting, and field limiting in MongoDB queries.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Utils/APIFeatures
+ */
+
+/**
  * APIFeatures — Chainable query builder for Mongoose.
  *
  * Supports: filter → sort → limitFields → paginate

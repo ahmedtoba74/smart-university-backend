@@ -2,25 +2,11 @@
  * ===================================================================================
  * @file      ragTools.js
  * @desc      RAG retrieval tool — available to all authenticated roles.
- *            Loaded when conversation.hasRagContext === true.
- *
- *            searchDocuments performs a vector similarity search against uploaded
- *            RAG chunks for the current conversation. The search filter includes
- *            both conversation_id and user_id as defense-in-depth to ensure no
- *            cross-user data is ever returned even if the conversation ownership
- *            check were accidentally bypassed.
- *
- *            Note: This tool is wired by the agent at construction time with the
- *            conversationId injected into userContext when hasRagContext is true.
- *            The agent will pass ragContext directly to the system prompt rather
- *            than calling this tool explicitly in most cases — this tool exists
- *            so the agent can re-query the document when the user asks follow-up
- *            questions about their uploaded file.
- *
- * @module    src/tools/registry/ragTools
- * @requires  zod
- * @requires  ../../../DB/models/ragChunkModel
+ *            Loaded when conversation.hasRagContext
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/tools/registry/ragTools
  */
 
 import { z } from "zod";

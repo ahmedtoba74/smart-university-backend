@@ -1,4 +1,14 @@
 /**
+ * ===================================================================================
+ * @file      appError.js
+ * @desc      Custom operational error class extending Error for Express error handling.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Utils/AppError
+ */
+
+/**
  * Custom Error class for operational errors.
  * @class AppError
  * @extends Error

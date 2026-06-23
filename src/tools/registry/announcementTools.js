@@ -3,22 +3,19 @@
  * @file      announcementTools.js
  * @desc      Tier 1 announcement tools — available to all authenticated roles.
  *            Contains getAnnouncements.
- *
  *            SECURITY: getAnnouncements MUST call buildVisibilityFilter(user)
  *            from announcementUtils.js before querying. Querying Announcement.find({})
  *            without this filter would leak announcements across role and college
  *            boundaries. The filter enforces:
- *              - Role-specific scope (Global/College/Department/Course)
- *              - Enrollment-based filtering for students
- *              - Assigned course filtering for doctors/TAs
- *              - College-scoped access for collegeAdmins
- *              - Unrestricted access for universityAdmin
- *
- * @module    src/tools/registry/announcementTools
- * @requires  zod
- * @requires  ../../../DB/models/announcementModel
- * @requires  ../../utils/announcementUtils
+ *            - Role-specific scope (Global/College/Department/Course)
+ *            - Enrollment-based filtering for students
+ *            - Assigned course filtering for doctors/TAs
+ *            - College-scoped access for collegeAdmins
+ *            - Unrestricted access for universityAdmin
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/tools/registry/announcementTools
  */
 
 import { z } from "zod";

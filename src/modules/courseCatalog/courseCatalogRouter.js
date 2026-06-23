@@ -1,6 +1,5 @@
 /**
  * ===================================================================================
- * @project   Smart University Platform
  * @file      courseCatalogRouter.js
  * @desc      Express router for the Course Catalog module. Defines standard CRUD
  *            operations mapping strictly to the Phase 3 architecture guidelines.
@@ -9,6 +8,7 @@
  * @author    Ahmed Toba
  * @version   1.0.0
  * ===================================================================================
+ * @module    Modules/Course Catalog/Router
  */
 import express from "express";
 import * as courseCatalogController from "./courseCatalogController.js";

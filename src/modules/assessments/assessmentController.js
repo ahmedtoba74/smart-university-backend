@@ -3,12 +3,10 @@
  * @file      assessmentController.js
  * @desc      Controller for assessment management and student access workflows.
  *            Handles CRUD, question security, shuffling, and assessment start.
- * @module    modules/assessment/assessmentController
- * @requires  Assessment, Submission, CourseOffering, Enrollment models
- * @audit     HIGH-3: Uses findById → mutate → save() for question updates
- *            MED-3: Never exposes isCorrect/modelAnswer to students
- *            D-21: Seeded shuffle for consistent student experience
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    modules/assessment/assessmentController
  */
 
 import Assessment from "../../../DB/models/assessmentModel.js";

@@ -3,15 +3,16 @@
  * @file      attendanceUtils.js
  * @desc      Utility functions for attendance percentage calculation and session cleanup.
  *            Exports three functions:
- *              - recalculateAttendance: per-student recalculation, called after each record.
- *              - recalculateAttendanceForOffering: bulk recalculation for all enrolled
- *                students, called at session end/expiry. Uses aggregation + bulkWrite
- *                to avoid exhausting the MongoDB connection pool on large courses.
- *              - expireDueSessions: cleanup job for naturally expired sessions; called
- *                by the setInterval in server.js every 5 minutes.
- * @module    src/utils/attendanceUtils
- * @requires  mongoose models, iotHubService
+ *            - recalculateAttendance: per-student recalculation, called after each record.
+ *            - recalculateAttendanceForOffering: bulk recalculation for all enrolled
+ *            students, called at session end/expiry. Uses aggregation + bulkWrite
+ *            to avoid exhausting the MongoDB connection pool on large courses.
+ *            - expireDueSessions: cleanup job for naturally expired sessions; called
+ *            by the setInterval in server.js every 5 minutes.
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/utils/attendanceUtils
  */
 
 import CourseOffering from '../../DB/models/courseOfferingModel.js';

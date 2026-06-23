@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      email.js
+ * @desc      Email service using Nodemailer for welcome emails, password resets, and verification codes.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Services/Email
+ */
+
 import nodemailer from "nodemailer";
 import { htmlToText } from "html-to-text";
 
@@ -31,7 +41,7 @@ export default class Email {
             return nodemailer.createTransport({
                 host: process.env.BREVO_HOST,
                 port: process.env.BREVO_PORT,
-                secure: false, // Brevo بيستخدم بورت 587 مع starttls، يبقى secure: false
+                secure: false, // Brevo uses port 587 with starttls, so secure: false
                 auth: {
                     user: process.env.BREVO_USER,
                     pass: process.env.BREVO_PASSWORD,

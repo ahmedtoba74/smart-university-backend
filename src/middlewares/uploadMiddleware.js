@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      uploadMiddleware.js
+ * @desc      Middleware for handling file uploads (Multer configurations).
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Middlewares/Upload
+ */
+
 import multer from "multer";
 import AppError from "../utils/appError.js";
 

@@ -4,13 +4,10 @@
  * @desc      Core AI chatbot service implementing LangChain agent orchestration.
  *            Handles Azure OpenAI chat and embedding configurations, context loading,
  *            token-triggered summarization, language detection, and RAG retrieval.
- * @module    src/services/chatService
- * @requires  @langchain/openai
- * @requires  @langchain/core/messages
- * @requires  @langchain/core/prompts
- * @requires  @langchain/classic/agents
- * @requires  ../utils/languageDetector
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/services/chatService
  */
 
 import { AzureChatOpenAI, AzureOpenAIEmbeddings } from "@langchain/openai";

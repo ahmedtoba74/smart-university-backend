@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      submissionModel.js
+ * @desc      Mongoose schema and model definition for Student Submissions, linking student answers to assessments with grading notes.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    DB/Models/Submission
+ */
+
 import mongoose from "mongoose";
 
 /**

@@ -4,9 +4,10 @@
  * @desc      Middleware for authenticating IoT fingerprint devices via shared secret.
  *            Device routes use x-device-secret header instead of JWT Bearer tokens.
  *            Uses timing-safe comparison to prevent timing-based secret extraction.
- * @module    src/middlewares/attendanceMiddleware
- * @requires  crypto, appError
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/middlewares/attendanceMiddleware
  */
 
 import crypto from 'crypto';

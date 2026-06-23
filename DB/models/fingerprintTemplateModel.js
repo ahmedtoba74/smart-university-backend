@@ -5,9 +5,10 @@
  *            Stores AES-256-GCM encrypted R503 fingerprint template data per student.
  *            Templates are decrypted only inside iotHubService when pushed to devices.
  *            API responses NEVER expose raw template bytes (select: false on all crypto fields).
- * @module    DB/models/fingerprintTemplateModel
- * @requires  mongoose
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    DB/models/fingerprintTemplateModel
  */
 
 import mongoose from "mongoose";

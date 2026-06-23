@@ -4,11 +4,10 @@
  * @desc      Controller for the Phase 5 Fingerprint Attendance System.
  *            Handles session lifecycle, IoT fingerprint marking, QR fallback,
  *            manual overrides, fingerprint enrollment, and device heartbeats.
- * @module    src/modules/attendance/attendanceController
- * @requires  catchAsync, AppError, filterReqBody, APIFeatures, nanoid, mongoose,
- *            all attendance/enrollment/offering/location/user models,
- *            cryptoUtils, attendanceUtils, iotHubService
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/modules/attendance/attendanceController
  */
 
 import catchAsync from '../../utils/catchAsync.js';

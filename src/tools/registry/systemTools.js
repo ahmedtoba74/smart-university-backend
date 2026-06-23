@@ -2,30 +2,24 @@
  * ===================================================================================
  * @file      systemTools.js
  * @desc      Tier 5 system tools — loaded for the 'universityAdmin' role only.
- *
  *            Contains:
- *              - getAllColleges               : All colleges with counts
- *              - getUniversityEnrollmentStats : Enrollment counts across all colleges
- *              - getUserById                 : Any user's profile by ID
- *              - getSystemSettings           : Full Settings singleton
- *
+ *            - getAllColleges               : All colleges with counts
+ *            - getUniversityEnrollmentStats : Enrollment counts across all colleges
+ *            - getUserById                 : Any user's profile by ID
+ *            - getSystemSettings           : Full Settings singleton
  *            Security notes:
- *              - universityAdmin scopeFilter is {} (unrestricted), matching
- *                how attachCollegeScope sets it for this role in the REST layer.
- *                The chatbot inherits this behavior identically.
- *              - getUserById uses an explicit .select() projection — security-sensitive
- *                fields (loginAttempts, lockoutStage, lockUntil, twoFactorSecret,
- *                passwordResetToken) are NEVER returned.
- *              - getAllColleges: the College model has an isArchived pre-find hook
- *                that auto-filters archived colleges from standard queries.
- *
- * @module    src/tools/registry/systemTools
- * @requires  zod
- * @requires  ../../../DB/models/collegeModel
- * @requires  ../../../DB/models/enrollmentModel
- * @requires  ../../../DB/models/userModel
- * @requires  ../../../DB/models/settingsModel
+ *            - universityAdmin scopeFilter is {} (unrestricted), matching
+ *            how attachCollegeScope sets it for this role in the REST layer.
+ *            The chatbot inherits this behavior identically.
+ *            - getUserById uses an explicit .select() projection — security-sensitive
+ *            fields (loginAttempts, lockoutStage, lockUntil, twoFactorSecret,
+ *            passwordResetToken) are NEVER returned.
+ *            - getAllColleges: the College model has an isArchived pre-find hook
+ *            that auto-filters archived colleges from standard queries.
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/tools/registry/systemTools
  */
 
 import { z } from "zod";

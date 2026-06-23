@@ -1,13 +1,13 @@
 /**
  * ===================================================================================
- * @project   Smart University Platform
  * @file      enrollmentRouter.js
  * @desc      Execution layer for the Enrollment Engine routes. Defines critical
  *            static priority architectures preventing Express hijacked routing
  *            over /force and /my endpoints. Implements strict Role Base validations.
  * @author    Ahmed Toba
- * @version   2.5.0
+ * @version   1.0.0
  * ===================================================================================
+ * @module    Modules/Enrollments/Router
  */
 import express from "express";
 import * as enrollmentController from "./enrollmentController.js";

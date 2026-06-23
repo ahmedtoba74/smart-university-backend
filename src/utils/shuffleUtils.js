@@ -3,9 +3,10 @@
  * @file      shuffleUtils.js
  * @desc      Deterministic shuffling utility using Linear Congruential Generator (LCG).
  *            Ensures same seed produces same shuffle order every time.
- * @module    utils/shuffleUtils
- * @audit     D-21: Seeded shuffle for consistent student experience
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    utils/shuffleUtils
  */
 
 /**

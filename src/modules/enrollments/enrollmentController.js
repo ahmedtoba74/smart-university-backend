@@ -7,8 +7,9 @@
  *            coupled with multi-stage Gate verifications (Term, Credit Limit,
  *            Prerequisites, Atomic Capacity).
  * @author    Ahmed Toba
- * @version   2.5.0
+ * @version   1.0.0
  * ===================================================================================
+ * @module    Modules/Enrollments/Controller
  */
 
 import mongoose from "mongoose";

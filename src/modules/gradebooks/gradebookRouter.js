@@ -3,9 +3,10 @@
  * @file      gradebookRouter.js
  * @desc      Router for gradebook management endpoints (semester work, GPA calculation).
  *            Base path: /api/v1/gradebook
- * @module    modules/gradebook/gradebookRouter
- * @requires  express, authMiddleware, gradebookController
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    modules/gradebook/gradebookRouter
  */
 
 import express from "express";

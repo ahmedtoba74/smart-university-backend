@@ -1,3 +1,13 @@
+/**
+ * ===================================================================================
+ * @file      locationRouter.js
+ * @desc      Router defining API endpoints for Campus Locations.
+ * @author    Ahmed Toba
+ * @version   1.0.0
+ * ===================================================================================
+ * @module    Modules/Campus Locations/Router
+ */
+
 import express from "express";
 import * as locationController from "./locationController.js";
 import {

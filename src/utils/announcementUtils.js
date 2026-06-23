@@ -3,21 +3,17 @@
  * @file      announcementUtils.js
  * @desc      Shared utilities for the Announcements module.
  *            Consolidates visibility filter construction and periodic expiration tasks.
- *
  *            Specifically, `buildVisibilityFilter` was extracted from the
  *            announcement controller to prevent code drift and ensure role-scoped
  *            tenant boundary compliance is evaluated identically across:
- *              - Announcement REST controller endpoints (Phase 6)
- *              - AI Chatbot Engine tool registry (Phase 7)
- *
+ *            - Announcement REST controller endpoints (Phase 6)
+ *            - AI Chatbot Engine tool registry (Phase 7)
  *            The `expireAnnouncements` function handles periodic cleanup of expired
  *            announcements, called by scheduled maintenance jobs in server.js.
- * @module    src/utils/announcementUtils
- * @requires  ../../DB/models/announcementModel
- * @requires  ../../DB/models/courseOfferingModel
- * @requires  ../../DB/models/departmentModel
- * @requires  ../../DB/models/enrollmentModel
+ * @author    Ahmed Toba
+ * @version   1.0.0
  * ===================================================================================
+ * @module    src/utils/announcementUtils
  */
 
 // ===================================================================================
