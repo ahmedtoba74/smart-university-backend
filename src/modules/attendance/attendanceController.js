@@ -10,34 +10,40 @@
  * @module    src/modules/attendance/attendanceController
  */
 
-import catchAsync from '../../utils/catchAsync.js';
-import AppError from '../../utils/appError.js';
-import { filterReqBody } from '../../utils/controllerUtils.js';
-import APIFeatures from '../../utils/apiFeatures.js';
-import { nanoid } from 'nanoid';
-import mongoose from 'mongoose';
-import AttendanceSession from '../../../DB/models/attendanceSessionModel.js';
-import AttendanceRecord from '../../../DB/models/attendanceRecordModel.js';
-import FingerprintTemplate from '../../../DB/models/fingerprintTemplateModel.js';
-import FingerprintEnrollmentRequest from '../../../DB/models/fingerprintEnrollmentRequestModel.js';
-import IoTDevice from '../../../DB/models/iotDeviceModel.js';
-import Enrollment from '../../../DB/models/enrollmentModel.js';
-import CourseOffering from '../../../DB/models/courseOfferingModel.js';
-import Location from '../../../DB/models/locationModel.js';
-import User from '../../../DB/models/userModel.js';
-import { encryptFingerprintTemplate } from '../../utils/cryptoUtils.js';
+import catchAsync from "../../utils/catchAsync.js";
+import AppError from "../../utils/appError.js";
+import { filterReqBody } from "../../utils/controllerUtils.js";
+import APIFeatures from "../../utils/apiFeatures.js";
+import { nanoid } from "nanoid";
+import mongoose from "mongoose";
+import AttendanceSession from "../../../DB/models/attendanceSessionModel.js";
+import AttendanceRecord from "../../../DB/models/attendanceRecordModel.js";
+import FingerprintTemplate from "../../../DB/models/fingerprintTemplateModel.js";
+import FingerprintEnrollmentRequest from "../../../DB/models/fingerprintEnrollmentRequestModel.js";
+import IoTDevice from "../../../DB/models/iotDeviceModel.js";
+import Enrollment from "../../../DB/models/enrollmentModel.js";
+import CourseOffering from "../../../DB/models/courseOfferingModel.js";
+import Location from "../../../DB/models/locationModel.js";
+import User from "../../../DB/models/userModel.js";
+import { encryptFingerprintTemplate } from "../../utils/cryptoUtils.js";
 import {
     recalculateAttendance,
     recalculateAttendanceForOffering,
-} from '../../utils/attendanceUtils.js';
-import * as iotHubService from '../../services/iotHubService.js';
+} from "../../utils/attendanceUtils.js";
+import * as iotHubService from "../../services/iotHubService.js";
 
 // ─── Mass-Assignment Whitelists (BE-MED-3) ────────────────────────────────────
-const CREATE_SESSION_ALLOWED  = ['courseOffering_id', 'location_id', 'forceHallSwitch', 'hallSwitchReason', 'durationMinutes'];
-const END_SESSION_ALLOWED     = ['reason'];
-const MANUAL_MARK_ALLOWED     = ['student_id', 'overrideReason'];
-const OVERRIDE_RECORD_ALLOWED = ['overrideReason'];
-const ENROLL_MODE_ALLOWED     = ['studentId', 'deviceId'];
+const CREATE_SESSION_ALLOWED = [
+    "courseOffering_id",
+    "location_id",
+    "forceHallSwitch",
+    "hallSwitchReason",
+    "durationMinutes",
+];
+const END_SESSION_ALLOWED = ["reason"];
+const MANUAL_MARK_ALLOWED = ["student_id", "overrideReason"];
+const OVERRIDE_RECORD_ALLOWED = ["overrideReason"];
+const ENROLL_MODE_ALLOWED = ["studentId", "deviceId"];
 
 // ===================================================================================
 // SESSION MANAGEMENT
@@ -52,13 +58,23 @@ const ENROLL_MODE_ALLOWED     = ['studentId', 'deviceId'];
  */
 export const createSession = catchAsync(async (req, res, next) => {
     const body = filterReqBody(req.body, CREATE_SESSION_ALLOWED);
-    const { courseOffering_id, location_id, forceHallSwitch, hallSwitchReason, durationMinutes } = body;
+    const {
+        courseOffering_id,
+        location_id,
+        forceHallSwitch,
+        hallSwitchReason,
+        durationMinutes,
+    } = body;
 
     // ── 1. Authorization ──────────────────────────────────────────────────────
     const offering = await CourseOffering.findById(courseOffering_id);
-    if (!offering) return next(new AppError('Course offering not found.', 404));
-    if (offering.college_id.toString() !== req.scopeFilter.college_id.toString()) {
-        return next(new AppError('You do not have access to this resource.', 403));
+    if (!offering) return next(new AppError("Course offering not found.", 404));
+    if (
+        offering.college_id.toString() !== req.scopeFilter.college_id.toString()
+    ) {
+        return next(
+            new AppError("You do not have access to this resource.", 403),
+        );
     }
     const isDoctor = offering.doctors_ids.some(
         (id) => id.toString() === req.user._id.toString(),
@@ -67,12 +83,14 @@ export const createSession = catchAsync(async (req, res, next) => {
         (id) => id.toString() === req.user._id.toString(),
     );
     if (!isDoctor && !isTA) {
-        return next(new AppError('You are not assigned to this course offering.', 403));
+        return next(
+            new AppError("You are not assigned to this course offering.", 403),
+        );
     }
     if (offering.semesterWorkLocked || offering.resultsPublished) {
         return next(
             new AppError(
-                'Attendance cannot be opened after semester work is locked or results are published.',
+                "Attendance cannot be opened after semester work is locked or results are published.",
                 400,
             ),
         );
@@ -81,12 +99,12 @@ export const createSession = catchAsync(async (req, res, next) => {
     // ── 2. Duplicate Active Session Guard (GAP-9) ─────────────────────────────
     const existingForOffering = await AttendanceSession.findOne({
         courseOffering_id,
-        status: 'active',
+        status: "active",
         expiresAt: { $gt: new Date() },
     });
     if (existingForOffering) {
         return res.status(200).json({
-            status: 'success',
+            status: "success",
             data: { session: existingForOffering, alreadyActive: true },
         });
     }
@@ -98,27 +116,31 @@ export const createSession = catchAsync(async (req, res, next) => {
 
     // Helper to resolve the scheduled location for the current time slot (GAP-10)
     const resolveScheduledLocation = () => {
-        const timezone = process.env.UNIVERSITY_TIMEZONE || 'Africa/Cairo';
+        const timezone = process.env.UNIVERSITY_TIMEZONE || "Africa/Cairo";
         const localNow = new Date();
-        const dayName = new Intl.DateTimeFormat('en-US', {
-            weekday: 'long',
+        const dayName = new Intl.DateTimeFormat("en-US", {
+            weekday: "long",
             timeZone: timezone,
         }).format(localNow);
-        const localTimeStr = localNow.toLocaleTimeString('en-US', {
+        const localTimeStr = localNow.toLocaleTimeString("en-US", {
             hour12: false,
-            hour: '2-digit',
-            minute: '2-digit',
+            hour: "2-digit",
+            minute: "2-digit",
             timeZone: timezone,
         });
-        const [nowH, nowM] = localTimeStr.split(':').map(Number);
+        const [nowH, nowM] = localTimeStr.split(":").map(Number);
         const nowMinutes = nowH * 60 + nowM;
-        const openBefore = Number(process.env.ATTENDANCE_OPEN_BEFORE_MINUTES || 15);
-        const closeAfter = Number(process.env.ATTENDANCE_CLOSE_AFTER_MINUTES || 15);
+        const openBefore = Number(
+            process.env.ATTENDANCE_OPEN_BEFORE_MINUTES || 15,
+        );
+        const closeAfter = Number(
+            process.env.ATTENDANCE_CLOSE_AFTER_MINUTES || 15,
+        );
 
         const slot = offering.schedule?.find((s) => {
             if (s.day !== dayName) return false;
-            const [sh, sm] = s.startTime.split(':').map(Number);
-            const [eh, em] = s.endTime.split(':').map(Number);
+            const [sh, sm] = s.startTime.split(":").map(Number);
+            const [eh, em] = s.endTime.split(":").map(Number);
             const slotStart = sh * 60 + sm - openBefore;
             const slotEnd = eh * 60 + em + closeAfter;
             return nowMinutes >= slotStart && nowMinutes <= slotEnd;
@@ -131,14 +153,14 @@ export const createSession = catchAsync(async (req, res, next) => {
         const conflict = await AttendanceSession.findOne({
             location_id,
             college_id: offering.college_id,
-            status: 'active',
+            status: "active",
             expiresAt: { $gt: new Date() },
-        }).populate('courseOffering_id initiatedBy_id');
+        }).populate("courseOffering_id initiatedBy_id");
 
         if (conflict && !forceHallSwitch) {
             return res.status(409).json({
-                status: 'fail',
-                message: 'Hall has an active session.',
+                status: "fail",
+                message: "Hall has an active session.",
                 conflictingSession: {
                     courseTitle: conflict.courseOffering_id?.title || null,
                     doctorName: conflict.initiatedBy_id?.name || null,
@@ -148,7 +170,7 @@ export const createSession = catchAsync(async (req, res, next) => {
             });
         }
         if (conflict && forceHallSwitch && !hallSwitchReason) {
-            return next(new AppError('Reason required for hall switch.', 400));
+            return next(new AppError("Reason required for hall switch.", 400));
         }
         if (forceHallSwitch) {
             hallSwitch = true;
@@ -157,33 +179,38 @@ export const createSession = catchAsync(async (req, res, next) => {
     } else {
         const scheduledLoc = resolveScheduledLocation();
         if (!scheduledLoc) {
-            return next(new AppError('No scheduled session found for the current time window.', 400));
+            return next(
+                new AppError(
+                    "No scheduled session found for the current time window.",
+                    400,
+                ),
+            );
         }
         resolvedLocationId = scheduledLoc;
     }
 
     // ── 4. Resolve Device ─────────────────────────────────────────────────────
     const location = await Location.findById(resolvedLocationId);
-    if (!location) return next(new AppError('Location not found.', 404));
+    if (!location) return next(new AppError("Location not found.", 404));
 
     let deviceId = location.readerId || null;
     let qrFallbackEnabled = false;
 
-    if (!deviceId || location.status === 'maintenance') {
+    if (!deviceId || location.status === "maintenance") {
         qrFallbackEnabled = true;
         deviceId = null;
     } else {
         // Optionally verify device is registered and active
         const device = await IoTDevice.findOne({
             deviceId,
-            role: 'room',
+            role: "room",
             isActive: true,
             college_id: offering.college_id,
         });
         if (!device) {
             console.warn(
                 `[createSession] IoT device '${deviceId}' not found in registry ` +
-                `(college ${offering.college_id}). Falling back to QR mode.`,
+                    `(college ${offering.college_id}). Falling back to QR mode.`,
             );
             qrFallbackEnabled = true;
         }
@@ -193,15 +220,15 @@ export const createSession = catchAsync(async (req, res, next) => {
     // NAMING TRAP (MED-2): Enrollment uses `course_id`, NOT `courseOffering_id`
     const enrollments = await Enrollment.find({
         course_id: courseOffering_id,
-        status: 'enrolled',
-    }).select('student_id');
+        status: "enrolled",
+    }).select("student_id");
     const studentIds = enrollments.map((e) => e.student_id);
 
     // ── 6. Query Fingerprint Templates ────────────────────────────────────────
     const templates = await FingerprintTemplate.find({
         student_id: { $in: studentIds },
         isActive: true,
-    }).select('+templateData +templateIv +templateAuthTag');
+    }).select("+templateData +templateIv +templateAuthTag");
 
     if (templates.length > 200) {
         return next(
@@ -223,7 +250,7 @@ export const createSession = catchAsync(async (req, res, next) => {
     }));
 
     // ── 8. Push Templates to Device ───────────────────────────────────────────
-    let templateLoadStatus = 'pending';
+    let templateLoadStatus = "pending";
     let templatesLoadedCount = 0;
     let finalTemplateMapping = templateMapping;
 
@@ -237,11 +264,11 @@ export const createSession = catchAsync(async (req, res, next) => {
         const requested = iotResult.totalRequested ?? templates.length;
 
         if (iotResult.success && loaded === requested) {
-            templateLoadStatus = 'loaded';
+            templateLoadStatus = "loaded";
             templatesLoadedCount = loaded;
         } else if (loaded > 0 && loaded < requested) {
             // D-2A: partial load — trim mapping to loaded indices only, enable QR
-            templateLoadStatus = 'failed';
+            templateLoadStatus = "failed";
             templatesLoadedCount = loaded;
             finalTemplateMapping = templateMapping.slice(0, loaded);
             qrFallbackEnabled = true;
@@ -250,22 +277,31 @@ export const createSession = catchAsync(async (req, res, next) => {
                     `QR fallback enabled.`,
             );
         } else {
-            templateLoadStatus = 'failed';
+            templateLoadStatus = "failed";
             templatesLoadedCount = 0;
             qrFallbackEnabled = true;
             if (iotResult.error) {
-                console.warn(`[createSession] Template push failed: ${iotResult.error}`);
+                console.warn(
+                    `[createSession] Template push failed: ${iotResult.error}`,
+                );
             }
         }
     } else if (qrFallbackEnabled) {
-        templateLoadStatus = 'qr_fallback';
+        templateLoadStatus = "qr_fallback";
     }
 
     // ── 9. Create Session ─────────────────────────────────────────────────────
-    const duration = Number(durationMinutes || process.env.ATTENDANCE_SESSION_DURATION_MINUTES || 90);
+    const duration = Number(
+        durationMinutes ||
+            process.env.ATTENDANCE_SESSION_DURATION_MINUTES ||
+            90,
+    );
     const initialQrToken = qrFallbackEnabled ? nanoid(32) : null;
     const initialQrExpiry = qrFallbackEnabled
-        ? new Date(Date.now() + Number(process.env.QR_TOKEN_TTL_SECONDS || 30) * 1000)
+        ? new Date(
+              Date.now() +
+                  Number(process.env.QR_TOKEN_TTL_SECONDS || 30) * 1000,
+          )
         : null;
 
     // college_id from offering.college_id — NOT from req.scopeFilter (verified ownership)
@@ -278,7 +314,7 @@ export const createSession = catchAsync(async (req, res, next) => {
         deviceId: deviceId || null,
         sessionNonce,
         templateBatchId,
-        status: 'active',
+        status: "active",
         templateLoadStatus,
         templatesLoadedCount,
         templateMapping: finalTemplateMapping,
@@ -291,7 +327,7 @@ export const createSession = catchAsync(async (req, res, next) => {
     });
 
     res.status(201).json({
-        status: 'success',
+        status: "success",
         data: {
             session,
             studentsWithoutFingerprint: studentIds.length - templates.length,
@@ -309,20 +345,27 @@ export const createSession = catchAsync(async (req, res, next) => {
  */
 export const getSessions = catchAsync(async (req, res, next) => {
     const { courseOffering_id } = req.query;
-    if (!courseOffering_id) return next(new AppError('courseOffering_id query parameter is required.', 400));
+    if (!courseOffering_id)
+        return next(
+            new AppError("courseOffering_id query parameter is required.", 400),
+        );
 
     const offering = await CourseOffering.findById(courseOffering_id);
-    if (!offering) return next(new AppError('Course offering not found.', 404));
-    if (offering.college_id.toString() !== req.scopeFilter.college_id.toString()) {
-        return next(new AppError('You do not have access to this resource.', 403));
+    if (!offering) return next(new AppError("Course offering not found.", 404));
+    if (
+        offering.college_id.toString() !== req.scopeFilter.college_id.toString()
+    ) {
+        return next(
+            new AppError("You do not have access to this resource.", 403),
+        );
     }
 
     const filter = {
         courseOffering_id,
         college_id: req.scopeFilter.college_id,
     };
-    if (req.query.active === 'true') {
-        filter.status = 'active';
+    if (req.query.active === "true") {
+        filter.status = "active";
         filter.expiresAt = { $gt: new Date() };
     }
 
@@ -333,13 +376,13 @@ export const getSessions = catchAsync(async (req, res, next) => {
         .paginate();
 
     const sessions = await features.query
-        .populate('location_id', 'name building roomNumber')
-        .populate('initiatedBy_id', 'name email');
+        .populate("location_id", "name building roomNumber")
+        .populate("initiatedBy_id", "name email");
 
     const totalResults = await features.countTotal(AttendanceSession, filter);
 
     res.status(200).json({
-        status: 'success',
+        status: "success",
         results: sessions.length,
         currentPage: features.page,
         totalPages: Math.ceil(totalResults / (features.limit || 10)),
@@ -358,14 +401,18 @@ export const endSession = catchAsync(async (req, res, next) => {
 
     // ── 1. Fetch + IDOR Guard ─────────────────────────────────────────────────
     const session = await AttendanceSession.findById(req.params.id);
-    if (!session) return next(new AppError('Session not found.', 404));
-    if (session.college_id.toString() !== req.scopeFilter.college_id.toString()) {
-        return next(new AppError('You do not have access to this resource.', 403));
+    if (!session) return next(new AppError("Session not found.", 404));
+    if (
+        session.college_id.toString() !== req.scopeFilter.college_id.toString()
+    ) {
+        return next(
+            new AppError("You do not have access to this resource.", 403),
+        );
     }
 
     // ── 2. Already Expired Guard ──────────────────────────────────────────────
-    if (session.status !== 'active' || session.expiresAt < new Date()) {
-        return next(new AppError('Session has already expired.', 400));
+    if (session.status !== "active" || session.expiresAt < new Date()) {
+        return next(new AppError("Session has already expired.", 400));
     }
 
     // ── 3. Staff Authorization ────────────────────────────────────────────────
@@ -376,8 +423,10 @@ export const endSession = catchAsync(async (req, res, next) => {
     const isTA = offering?.tas_ids?.some(
         (id) => id.toString() === req.user._id.toString(),
     );
-    if (!isDoctor && !isTA && req.user.role !== 'collegeAdmin') {
-        return next(new AppError('You are not authorized to end this session.', 403));
+    if (!isDoctor && !isTA && req.user.role !== "collegeAdmin") {
+        return next(
+            new AppError("You are not authorized to end this session.", 403),
+        );
     }
 
     // ── 4. Clear Device Templates (best-effort) ───────────────────────────────
@@ -385,7 +434,9 @@ export const endSession = catchAsync(async (req, res, next) => {
         await iotHubService
             .clearDeviceTemplates(session.deviceId, session._id)
             .catch((err) =>
-                console.error(`[endSession] clearDeviceTemplates failed: ${err.message}`),
+                console.error(
+                    `[endSession] clearDeviceTemplates failed: ${err.message}`,
+                ),
             );
     }
 
@@ -395,19 +446,19 @@ export const endSession = catchAsync(async (req, res, next) => {
     });
 
     // ── 6. End Session ────────────────────────────────────────────────────────
-    session.status = 'ended';
+    session.status = "ended";
     session.endedAt = new Date();
     session.expiresAt = session.endedAt;
     session.endedBy = req.user._id;
-    session.endReason = body.reason || 'manual_end';
+    session.endReason = body.reason || "manual_end";
     await session.save();
 
     // ── 7. Recalculate All Enrolled Students (D-12) ───────────────────────────
     await recalculateAttendanceForOffering(session.courseOffering_id);
 
     res.status(200).json({
-        status: 'success',
-        data: { message: 'Session ended.', attendanceCount },
+        status: "success",
+        data: { message: "Session ended.", attendanceCount },
     });
 });
 
@@ -418,15 +469,19 @@ export const endSession = catchAsync(async (req, res, next) => {
  */
 export const enableQrFallback = catchAsync(async (req, res, next) => {
     const session = await AttendanceSession.findById(req.params.id);
-    if (!session) return next(new AppError('Session not found.', 404));
-    if (session.college_id.toString() !== req.scopeFilter.college_id.toString()) {
-        return next(new AppError('You do not have access to this resource.', 403));
+    if (!session) return next(new AppError("Session not found.", 404));
+    if (
+        session.college_id.toString() !== req.scopeFilter.college_id.toString()
+    ) {
+        return next(
+            new AppError("You do not have access to this resource.", 403),
+        );
     }
     if (session.qrFallbackEnabled) {
-        return next(new AppError('QR fallback is already enabled.', 400));
+        return next(new AppError("QR fallback is already enabled.", 400));
     }
-    if (session.status !== 'active' || session.expiresAt < new Date()) {
-        return next(new AppError('Session has already expired.', 400));
+    if (session.status !== "active" || session.expiresAt < new Date()) {
+        return next(new AppError("Session has already expired.", 400));
     }
 
     const offering = await CourseOffering.findById(session.courseOffering_id);
@@ -437,7 +492,9 @@ export const enableQrFallback = catchAsync(async (req, res, next) => {
         (id) => id.toString() === req.user._id.toString(),
     );
     if (!isDoctor && !isTA) {
-        return next(new AppError('You are not authorized to enable QR fallback.', 403));
+        return next(
+            new AppError("You are not authorized to enable QR fallback.", 403),
+        );
     }
 
     session.qrFallbackEnabled = true;
@@ -445,11 +502,11 @@ export const enableQrFallback = catchAsync(async (req, res, next) => {
     session.qrTokenExpiresAt = new Date(
         Date.now() + Number(process.env.QR_TOKEN_TTL_SECONDS || 30) * 1000,
     );
-    session.templateLoadStatus = 'qr_fallback';
+    session.templateLoadStatus = "qr_fallback";
     await session.save();
 
     res.status(200).json({
-        status: 'success',
+        status: "success",
         data: {
             session,
             qrToken: session.qrFallbackToken,
@@ -466,15 +523,19 @@ export const enableQrFallback = catchAsync(async (req, res, next) => {
  */
 export const refreshQrToken = catchAsync(async (req, res, next) => {
     const session = await AttendanceSession.findById(req.params.id);
-    if (!session) return next(new AppError('Session not found.', 404));
-    if (session.college_id.toString() !== req.scopeFilter.college_id.toString()) {
-        return next(new AppError('You do not have access to this resource.', 403));
+    if (!session) return next(new AppError("Session not found.", 404));
+    if (
+        session.college_id.toString() !== req.scopeFilter.college_id.toString()
+    ) {
+        return next(
+            new AppError("You do not have access to this resource.", 403),
+        );
     }
     if (!session.qrFallbackEnabled) {
-        return next(new AppError('QR fallback is not enabled.', 400));
+        return next(new AppError("QR fallback is not enabled.", 400));
     }
-    if (session.status !== 'active' || session.expiresAt < new Date()) {
-        return next(new AppError('Session has already expired.', 400));
+    if (session.status !== "active" || session.expiresAt < new Date()) {
+        return next(new AppError("Session has already expired.", 400));
     }
 
     const offering = await CourseOffering.findById(session.courseOffering_id);
@@ -485,7 +546,12 @@ export const refreshQrToken = catchAsync(async (req, res, next) => {
         (id) => id.toString() === req.user._id.toString(),
     );
     if (!isDoctor && !isTA) {
-        return next(new AppError('You are not authorized to refresh the QR token.', 403));
+        return next(
+            new AppError(
+                "You are not authorized to refresh the QR token.",
+                403,
+            ),
+        );
     }
 
     // Rotate: keep previous token for grace window
@@ -498,7 +564,7 @@ export const refreshQrToken = catchAsync(async (req, res, next) => {
     await session.save();
 
     res.status(200).json({
-        status: 'success',
+        status: "success",
         data: {
             qrToken: session.qrFallbackToken,
             expiresIn: Number(process.env.QR_TOKEN_TTL_SECONDS || 30),
@@ -530,14 +596,22 @@ export const fingerprintMark = catchAsync(async (req, res, next) => {
     } = req.body;
 
     // ── 1. Validate Required Fields ───────────────────────────────────────────
-    if (!deviceId || !sessionId || !sessionNonce || !templateBatchId || fingerprintLocalId === undefined) {
-        return next(new AppError('Missing required fields in device payload.', 400));
+    if (
+        !deviceId ||
+        !sessionId ||
+        !sessionNonce ||
+        !templateBatchId ||
+        fingerprintLocalId === undefined
+    ) {
+        return next(
+            new AppError("Missing required fields in device payload.", 400),
+        );
     }
 
     // ── 2. Resolve Location ────────────────────────────────────────────────────
     // Location has isArchived pre-find hook — archived locations return null → 404
     const location = await Location.findOne({ readerId: deviceId });
-    if (!location) return next(new AppError('Unknown device.', 404));
+    if (!location) return next(new AppError("Unknown device.", 404));
 
     // ── 3. Find Session (by cryptographic identity — no status filter) ─────────
     // BE-CRIT: Do NOT add status: 'active' — offline scans arrive after expiry
@@ -547,31 +621,46 @@ export const fingerprintMark = catchAsync(async (req, res, next) => {
         templateBatchId,
         location_id: location._id,
     });
-    if (!session) return next(new AppError('No session found for this device event.', 400));
+    if (!session)
+        return next(
+            new AppError("No session found for this device event.", 400),
+        );
 
     // ── Validate Scan Timestamp ────────────────────────────────────────────────
     let scanTime;
     try {
         scanTime = timestamp ? new Date(timestamp) : new Date();
-        if (isNaN(scanTime.getTime())) return next(new AppError('Invalid scan timestamp.', 400));
+        if (isNaN(scanTime.getTime()))
+            return next(new AppError("Invalid scan timestamp.", 400));
     } catch {
-        return next(new AppError('Invalid scan timestamp.', 400));
+        return next(new AppError("Invalid scan timestamp.", 400));
     }
 
-    const clockSkewMs = Number(process.env.DEVICE_CLOCK_SKEW_SECONDS || 120) * 1000;
+    const clockSkewMs =
+        Number(process.env.DEVICE_CLOCK_SKEW_SECONDS || 120) * 1000;
     if (scanTime > new Date(Date.now() + clockSkewMs)) {
-        return next(new AppError('Scan timestamp is too far in the future.', 400));
+        return next(
+            new AppError("Scan timestamp is too far in the future.", 400),
+        );
     }
 
     const sessionStart = session.startTime || session.createdAt;
     const sessionEnd = session.endedAt || session.expiresAt;
     if (scanTime < sessionStart || scanTime > sessionEnd) {
-        return next(new AppError('Scan timestamp is outside the attendance session window.', 400));
+        return next(
+            new AppError(
+                "Scan timestamp is outside the attendance session window.",
+                400,
+            ),
+        );
     }
 
     // ── 4. Resolve Student from Template Mapping (D-2) ────────────────────────
-    const mapping = session.templateMapping.find((m) => m.localId === fingerprintLocalId);
-    if (!mapping) return next(new AppError('Unknown fingerprint local ID.', 400));
+    const mapping = session.templateMapping.find(
+        (m) => m.localId === fingerprintLocalId,
+    );
+    if (!mapping)
+        return next(new AppError("Unknown fingerprint local ID.", 400));
     const student_id = mapping.student_id;
 
     // ── 5. Enrollment Guard ────────────────────────────────────────────────────
@@ -579,15 +668,17 @@ export const fingerprintMark = catchAsync(async (req, res, next) => {
     const enrollment = await Enrollment.findOne({
         student_id,
         course_id: session.courseOffering_id,
-        status: 'enrolled',
+        status: "enrolled",
         college_id: session.college_id,
     });
-    if (!enrollment) return next(new AppError('Student not enrolled.', 400));
+    if (!enrollment) return next(new AppError("Student not enrolled.", 400));
 
     // ── Confidence Check ──────────────────────────────────────────────────────
     const minConfidence = Number(process.env.FINGERPRINT_MIN_CONFIDENCE || 40);
     if (confidence < minConfidence) {
-        return next(new AppError('Fingerprint confidence below threshold.', 400));
+        return next(
+            new AppError("Fingerprint confidence below threshold.", 400),
+        );
     }
 
     // ── 6. Duplicate Check + Create Record (BE-CRIT-2, BE-CRIT-3) ─────────────
@@ -596,7 +687,7 @@ export const fingerprintMark = catchAsync(async (req, res, next) => {
         record = await AttendanceRecord.create({
             session_id: session._id,
             student_id,
-            source: 'fingerprint',
+            source: "fingerprint",
             deviceId,
             confidence,
             scannedAt: scanTime,
@@ -610,7 +701,7 @@ export const fingerprintMark = catchAsync(async (req, res, next) => {
     } catch (err) {
         if (err.code === 11000) {
             return res.status(200).json({
-                status: 'success',
+                status: "success",
                 data: { alreadyMarked: true },
             });
         }
@@ -622,8 +713,8 @@ export const fingerprintMark = catchAsync(async (req, res, next) => {
 
     // ── 8. Response (includes ledCommand for Azure Function relay) ────────────
     res.status(200).json({
-        status: 'success',
-        data: { record, ledCommand: 'green' },
+        status: "success",
+        data: { record, ledCommand: "green" },
     });
 });
 
@@ -638,17 +729,23 @@ export const qrMark = catchAsync(async (req, res, next) => {
 
     // ── 1. Fetch Session + IDOR Guard ─────────────────────────────────────────
     const session = await AttendanceSession.findById(sessionId);
-    if (!session) return next(new AppError('Session not found.', 404));
-    if (session.college_id.toString() !== req.scopeFilter.college_id.toString()) {
-        return next(new AppError('You do not have access to this resource.', 403));
+    if (!session) return next(new AppError("Session not found.", 404));
+    if (
+        session.college_id.toString() !== req.scopeFilter.college_id.toString()
+    ) {
+        return next(
+            new AppError("You do not have access to this resource.", 403),
+        );
     }
 
     // ── 2. Session Guards ─────────────────────────────────────────────────────
-    if (session.status !== 'active' || session.expiresAt < new Date()) {
-        return next(new AppError('Session has expired.', 400));
+    if (session.status !== "active" || session.expiresAt < new Date()) {
+        return next(new AppError("Session has expired.", 400));
     }
     if (!session.qrFallbackEnabled) {
-        return next(new AppError('QR fallback is not enabled for this session.', 400));
+        return next(
+            new AppError("QR fallback is not enabled for this session.", 400),
+        );
     }
 
     // ── 3. QR Token Validation (current + previous grace window) — MED-8 ──────
@@ -663,7 +760,7 @@ export const qrMark = catchAsync(async (req, res, next) => {
         session.previousQrTokenExpiresAt &&
         now <= new Date(session.previousQrTokenExpiresAt.getTime() + graceMs);
     if (!currentTokenValid && !previousTokenValid) {
-        return next(new AppError('Invalid or expired QR token.', 400));
+        return next(new AppError("Invalid or expired QR token.", 400));
     }
 
     // ── 4. Enrollment Guard (BE-MED-5 — defense-in-depth, uses req.scopeFilter) ─
@@ -671,10 +768,11 @@ export const qrMark = catchAsync(async (req, res, next) => {
     const enrollment = await Enrollment.findOne({
         student_id: req.user._id,
         course_id: session.courseOffering_id,
-        status: 'enrolled',
+        status: "enrolled",
         college_id: req.scopeFilter.college_id, // BE-MED-5: req.scopeFilter, NOT session.college_id
     });
-    if (!enrollment) return next(new AppError('You are not enrolled in this course.', 403));
+    if (!enrollment)
+        return next(new AppError("You are not enrolled in this course.", 403));
 
     // ── 5. Duplicate Check + Create Record ────────────────────────────────────
     let record;
@@ -682,7 +780,7 @@ export const qrMark = catchAsync(async (req, res, next) => {
         record = await AttendanceRecord.create({
             session_id: session._id,
             student_id: req.user._id,
-            source: 'qr',
+            source: "qr",
             college_id: session.college_id,
             courseOffering_id: session.courseOffering_id,
             timestamp: new Date(),
@@ -690,7 +788,7 @@ export const qrMark = catchAsync(async (req, res, next) => {
     } catch (err) {
         if (err.code === 11000) {
             return res.status(200).json({
-                status: 'success',
+                status: "success",
                 data: { alreadyMarked: true },
             });
         }
@@ -701,7 +799,7 @@ export const qrMark = catchAsync(async (req, res, next) => {
     await recalculateAttendance(req.user._id, session.courseOffering_id);
 
     res.status(200).json({
-        status: 'success',
+        status: "success",
         data: { success: true },
     });
 });
@@ -713,13 +811,17 @@ export const qrMark = catchAsync(async (req, res, next) => {
  */
 export const getSessionReport = catchAsync(async (req, res, next) => {
     const session = await AttendanceSession.findById(req.params.sessionId);
-    if (!session) return next(new AppError('Session not found.', 404));
-    if (session.college_id.toString() !== req.scopeFilter.college_id.toString()) {
-        return next(new AppError('You do not have access to this resource.', 403));
+    if (!session) return next(new AppError("Session not found.", 404));
+    if (
+        session.college_id.toString() !== req.scopeFilter.college_id.toString()
+    ) {
+        return next(
+            new AppError("You do not have access to this resource.", 403),
+        );
     }
 
     const offering = await CourseOffering.findById(session.courseOffering_id);
-    if (req.user.role !== 'collegeAdmin') {
+    if (req.user.role !== "collegeAdmin") {
         const isDoctor = offering?.doctors_ids?.some(
             (id) => id.toString() === req.user._id.toString(),
         );
@@ -727,19 +829,24 @@ export const getSessionReport = catchAsync(async (req, res, next) => {
             (id) => id.toString() === req.user._id.toString(),
         );
         if (!isDoctor && !isTA) {
-            return next(new AppError('You are not authorized to view this report.', 403));
+            return next(
+                new AppError(
+                    "You are not authorized to view this report.",
+                    403,
+                ),
+            );
         }
     }
 
     const records = await AttendanceRecord.find({ session_id: session._id })
-        .populate('student_id', 'name email')
+        .populate("student_id", "name email")
         .sort({ timestamp: 1 });
 
     // NAMING TRAP (MED-2): Enrollment uses `course_id`
     const enrollments = await Enrollment.find({
         course_id: session.courseOffering_id,
-        status: 'enrolled',
-    }).populate('student_id', 'name email');
+        status: "enrolled",
+    }).populate("student_id", "name email");
 
     const presentIds = records.map((r) => r.student_id._id.toString());
     const absentStudents = enrollments
@@ -747,7 +854,7 @@ export const getSessionReport = catchAsync(async (req, res, next) => {
         .map((e) => e.student_id);
 
     res.status(200).json({
-        status: 'success',
+        status: "success",
         data: {
             session,
             present: records,
@@ -759,7 +866,12 @@ export const getSessionReport = catchAsync(async (req, res, next) => {
                 attendanceRate:
                     enrollments.length === 0
                         ? 0
-                        : Number(((records.length / enrollments.length) * 100).toFixed(1)),
+                        : Number(
+                              (
+                                  (records.length / enrollments.length) *
+                                  100
+                              ).toFixed(1),
+                          ),
             },
         },
     });
@@ -773,7 +885,9 @@ export const getSessionReport = catchAsync(async (req, res, next) => {
 export const getMyAttendance = catchAsync(async (req, res, next) => {
     const { courseOffering_id } = req.query;
     if (!courseOffering_id) {
-        return next(new AppError('courseOffering_id query parameter is required.', 400));
+        return next(
+            new AppError("courseOffering_id query parameter is required.", 400),
+        );
     }
 
     // Enrollment guard — also confirms student belongs to this course + college
@@ -783,7 +897,8 @@ export const getMyAttendance = catchAsync(async (req, res, next) => {
         course_id: courseOffering_id,
         college_id: req.scopeFilter.college_id,
     });
-    if (!enrollment) return next(new AppError('You are not enrolled in this course.', 403));
+    if (!enrollment)
+        return next(new AppError("You are not enrolled in this course.", 403));
 
     const records = await AttendanceRecord.find({
         student_id: req.user._id,
@@ -792,10 +907,12 @@ export const getMyAttendance = catchAsync(async (req, res, next) => {
     }).sort({ timestamp: -1 }); // Sort by timestamp field (not createdAt)
 
     // Count ALL sessions — no status filter (active + expired + ended all count)
-    const totalSessions = await AttendanceSession.countDocuments({ courseOffering_id });
+    const totalSessions = await AttendanceSession.countDocuments({
+        courseOffering_id,
+    });
 
     res.status(200).json({
-        status: 'success',
+        status: "success",
         data: {
             records,
             summary: {
@@ -820,9 +937,13 @@ export const overrideAttendance = catchAsync(async (req, res, next) => {
 
     // ── 1. Fetch + IDOR Guard ─────────────────────────────────────────────────
     const record = await AttendanceRecord.findById(req.params.id);
-    if (!record) return next(new AppError('Attendance record not found.', 404));
-    if (record.college_id.toString() !== req.scopeFilter.college_id.toString()) {
-        return next(new AppError('You do not have access to this resource.', 403));
+    if (!record) return next(new AppError("Attendance record not found.", 404));
+    if (
+        record.college_id.toString() !== req.scopeFilter.college_id.toString()
+    ) {
+        return next(
+            new AppError("You do not have access to this resource.", 403),
+        );
     }
 
     // ── 2. Staff Authorization ────────────────────────────────────────────────
@@ -836,12 +957,17 @@ export const overrideAttendance = catchAsync(async (req, res, next) => {
     const isTA = offering?.tas_ids?.some(
         (id) => id.toString() === req.user._id.toString(),
     );
-    if (!isDoctor && !isTA && req.user.role !== 'collegeAdmin') {
-        return next(new AppError('You are not authorized to override this record.', 403));
+    if (!isDoctor && !isTA && req.user.role !== "collegeAdmin") {
+        return next(
+            new AppError(
+                "You are not authorized to override this record.",
+                403,
+            ),
+        );
     }
 
     // ── 3. Update Server-Side Only ─────────────────────────────────────────────
-    record.source = 'manual_override';
+    record.source = "manual_override";
     record.overrideBy = req.user._id; // Server-side — NEVER from body
     record.overrideReason = overrideReason;
     await record.save();
@@ -850,7 +976,7 @@ export const overrideAttendance = catchAsync(async (req, res, next) => {
     await recalculateAttendance(record.student_id, record.courseOffering_id);
 
     res.status(200).json({
-        status: 'success',
+        status: "success",
         data: { record },
     });
 });
@@ -867,12 +993,16 @@ export const manualMarkAttendance = catchAsync(async (req, res, next) => {
 
     // ── 1. Fetch Session + IDOR Guard ─────────────────────────────────────────
     const session = await AttendanceSession.findById(req.params.sessionId);
-    if (!session) return next(new AppError('Session not found.', 404));
-    if (session.college_id.toString() !== req.scopeFilter.college_id.toString()) {
-        return next(new AppError('You do not have access to this resource.', 403));
+    if (!session) return next(new AppError("Session not found.", 404));
+    if (
+        session.college_id.toString() !== req.scopeFilter.college_id.toString()
+    ) {
+        return next(
+            new AppError("You do not have access to this resource.", 403),
+        );
     }
-    if (session.status !== 'active' || session.expiresAt < new Date()) {
-        return next(new AppError('Session has already expired.', 400));
+    if (session.status !== "active" || session.expiresAt < new Date()) {
+        return next(new AppError("Session has already expired.", 400));
     }
 
     // ── 2. Staff Authorization ─────────────────────────────────────────────────
@@ -883,8 +1013,13 @@ export const manualMarkAttendance = catchAsync(async (req, res, next) => {
     const isTA = offering?.tas_ids?.some(
         (id) => id.toString() === req.user._id.toString(),
     );
-    if (!isDoctor && !isTA && req.user.role !== 'collegeAdmin') {
-        return next(new AppError('You are not authorized to mark attendance manually.', 403));
+    if (!isDoctor && !isTA && req.user.role !== "collegeAdmin") {
+        return next(
+            new AppError(
+                "You are not authorized to mark attendance manually.",
+                403,
+            ),
+        );
     }
 
     // ── 3. Enrollment Guard ────────────────────────────────────────────────────
@@ -892,10 +1027,13 @@ export const manualMarkAttendance = catchAsync(async (req, res, next) => {
     const enrollment = await Enrollment.findOne({
         student_id,
         course_id: session.courseOffering_id,
-        status: 'enrolled',
+        status: "enrolled",
         college_id: req.scopeFilter.college_id,
     });
-    if (!enrollment) return next(new AppError('Student is not enrolled in this course.', 400));
+    if (!enrollment)
+        return next(
+            new AppError("Student is not enrolled in this course.", 400),
+        );
 
     // ── 4. Duplicate Check + Create Record ─────────────────────────────────────
     let record;
@@ -905,7 +1043,7 @@ export const manualMarkAttendance = catchAsync(async (req, res, next) => {
             student_id,
             courseOffering_id: session.courseOffering_id,
             college_id: req.scopeFilter.college_id,
-            source: 'manual_override',
+            source: "manual_override",
             overrideReason,
             overrideBy: req.user._id,
             timestamp: new Date(),
@@ -913,7 +1051,7 @@ export const manualMarkAttendance = catchAsync(async (req, res, next) => {
     } catch (err) {
         if (err.code === 11000) {
             return res.status(200).json({
-                status: 'success',
+                status: "success",
                 data: { alreadyMarked: true },
             });
         }
@@ -924,7 +1062,7 @@ export const manualMarkAttendance = catchAsync(async (req, res, next) => {
     await recalculateAttendance(student_id, session.courseOffering_id);
 
     res.status(201).json({
-        status: 'success',
+        status: "success",
         data: { record },
     });
 });
@@ -935,10 +1073,11 @@ export const manualMarkAttendance = catchAsync(async (req, res, next) => {
  * @access IoT device (x-device-secret)
  */
 export const deviceHeartbeat = catchAsync(async (req, res, next) => {
-    const { deviceId, firmwareVersion, freeHeap, wifiRSSI, uptime, timestamp } = req.body;
+    const { deviceId, firmwareVersion, freeHeap, wifiRSSI, uptime, timestamp } =
+        req.body;
 
     if (!deviceId) {
-        return next(new AppError('deviceId is required.', 400));
+        return next(new AppError("deviceId is required.", 400));
     }
 
     const device = await IoTDevice.findOneAndUpdate(
@@ -955,13 +1094,13 @@ export const deviceHeartbeat = catchAsync(async (req, res, next) => {
 
     if (!device) {
         return res.status(404).json({
-            status: 'fail',
+            status: "fail",
             message: `Device '${deviceId}' is not registered. Contact admin.`,
         });
     }
 
     res.status(200).json({
-        status: 'success',
+        status: "success",
         data: { received: true },
     });
 });
@@ -983,9 +1122,13 @@ export const triggerEnrollMode = catchAsync(async (req, res, next) => {
 
     // ── 1. Validate Student ────────────────────────────────────────────────────
     const student = await User.findById(studentId);
-    if (!student) return next(new AppError('Student not found.', 400));
-    if (student.college_id.toString() !== req.scopeFilter.college_id.toString()) {
-        return next(new AppError('Student does not belong to your college.', 403));
+    if (!student) return next(new AppError("Student not found.", 400));
+    if (
+        student.college_id.toString() !== req.scopeFilter.college_id.toString()
+    ) {
+        return next(
+            new AppError("Student does not belong to your college.", 403),
+        );
     }
 
     // Prevent enrollment of already enrolled fingerprint (Refinement 1)
@@ -994,20 +1137,48 @@ export const triggerEnrollMode = catchAsync(async (req, res, next) => {
         isActive: true,
     });
     if (existingTemplate) {
-        return next(new AppError('Student already has an active fingerprint template.', 400));
+        return next(
+            new AppError(
+                "Student already has an active fingerprint template.",
+                400,
+            ),
+        );
+    }
+
+    // Check if there is already a pending enrollment request for the same student
+    const pendingRequest = await FingerprintEnrollmentRequest.findOne({
+        student_id: studentId,
+        status: "pending",
+        expiresAt: { $gt: new Date() },
+    });
+    if (pendingRequest) {
+        return next(
+            new AppError(
+                "Student already has a pending fingerprint enrollment request.",
+                400,
+            ),
+        );
     }
 
     // ── 2. Resolve Device ─────────────────────────────────────────────────────
     if (!deviceId) {
         const centralDevice = await IoTDevice.findOne({
-            role: 'central',
+            role: "central",
             college_id: req.scopeFilter.college_id,
             isActive: true,
         });
-        deviceId = centralDevice?.deviceId || process.env.IOT_CENTRAL_DEVICE_ID || null;
+        deviceId =
+            centralDevice?.deviceId ||
+            process.env.IOT_CENTRAL_DEVICE_ID ||
+            null;
     }
     if (!deviceId) {
-        return next(new AppError('No enrollment device found. Set IOT_CENTRAL_DEVICE_ID or register a central device.', 400));
+        return next(
+            new AppError(
+                "No enrollment device found. Set IOT_CENTRAL_DEVICE_ID or register a central device.",
+                400,
+            ),
+        );
     }
 
     // ── 3. Create Enrollment Request ──────────────────────────────────────────
@@ -1029,8 +1200,12 @@ export const triggerEnrollMode = catchAsync(async (req, res, next) => {
     });
 
     res.status(200).json({
-        status: 'success',
-        data: { message: 'Enrollment mode activated.', deviceId, expiresIn: 120 },
+        status: "success",
+        data: {
+            message: "Enrollment mode activated.",
+            deviceId,
+            expiresIn: 120,
+        },
     });
 });
 
@@ -1041,21 +1216,28 @@ export const triggerEnrollMode = catchAsync(async (req, res, next) => {
  * @access IoT device (x-device-secret)
  */
 export const registerFingerprint = catchAsync(async (req, res, next) => {
-    const { studentId, enrollmentNonce, deviceId, templateData, quality, success } = req.body;
+    const {
+        studentId,
+        enrollmentNonce,
+        deviceId,
+        templateData,
+        quality,
+        success,
+    } = req.body;
 
     if (success === false) {
         return next(
             new AppError(
                 req.body.error
                     ? `Enrollment failed on device: ${req.body.error}`
-                    : 'Enrollment failed on device.',
+                    : "Enrollment failed on device.",
                 400,
             ),
         );
     }
 
     if (!enrollmentNonce) {
-        return next(new AppError('enrollmentNonce is required.', 400));
+        return next(new AppError("enrollmentNonce is required.", 400));
     }
 
     // ── 1. Validate Enrollment Request ────────────────────────────────────────
@@ -1063,37 +1245,57 @@ export const registerFingerprint = catchAsync(async (req, res, next) => {
         student_id: studentId,
         nonce: enrollmentNonce,
         deviceId,
-        status: 'pending',
+        status: "pending",
         expiresAt: { $gt: new Date() },
     });
     if (!request) {
-        return next(new AppError('Invalid or expired enrollment request.', 400));
+        return next(
+            new AppError("Invalid or expired enrollment request.", 400),
+        );
     }
 
     // ── Validate Student and College Match (Refinement 2) ─────────────────────
     const student = await User.findById(studentId);
     if (!student) {
-        return next(new AppError('Student not found.', 400));
+        return next(new AppError("Student not found.", 400));
     }
-    if (!student.college_id || student.college_id.toString() !== request.college_id.toString()) {
-        return next(new AppError('Student/College association mismatch or invalid college.', 400));
+    if (
+        !student.college_id ||
+        student.college_id.toString() !== request.college_id.toString()
+    ) {
+        return next(
+            new AppError(
+                "Student/College association mismatch or invalid college.",
+                400,
+            ),
+        );
     }
 
     // ── Validate Quality (Refinement 3) ──────────────────────────────────────
     const minConfidence = Number(process.env.FINGERPRINT_MIN_CONFIDENCE || 40);
     if (quality !== undefined && quality < minConfidence) {
-        return next(new AppError(`Fingerprint quality (${quality}) is below minimum threshold (${minConfidence}).`, 400));
+        return next(
+            new AppError(
+                `Fingerprint quality (${quality}) is below minimum threshold (${minConfidence}).`,
+                400,
+            ),
+        );
     }
 
     // ── 2. Validate Template Size ─────────────────────────────────────────────
     let decoded;
     try {
-        decoded = Buffer.from(templateData, 'base64');
+        decoded = Buffer.from(templateData, "base64");
     } catch {
-        return next(new AppError('Invalid template data encoding.', 400));
+        return next(new AppError("Invalid template data encoding.", 400));
     }
     if (decoded.length !== 768) {
-        return next(new AppError('Invalid fingerprint template size. Expected 768 bytes.', 400));
+        return next(
+            new AppError(
+                "Invalid fingerprint template size. Expected 768 bytes.",
+                400,
+            ),
+        );
     }
 
     // ── 3. Encrypt Template (D-13) ────────────────────────────────────────────
@@ -1118,11 +1320,11 @@ export const registerFingerprint = catchAsync(async (req, res, next) => {
     );
 
     // ── 5. Mark Request Completed ─────────────────────────────────────────────
-    request.status = 'completed';
+    request.status = "completed";
     await request.save();
 
     res.status(201).json({
-        status: 'success',
+        status: "success",
         data: { enrolled: true, templateId: template._id },
     });
 });
@@ -1134,20 +1336,23 @@ export const registerFingerprint = catchAsync(async (req, res, next) => {
  */
 export const listFingerprints = catchAsync(async (req, res) => {
     const filter = { college_id: req.scopeFilter.college_id };
-    const features = new APIFeatures(FingerprintTemplate.find(filter), req.query)
+    const features = new APIFeatures(
+        FingerprintTemplate.find(filter),
+        req.query,
+    )
         .filter()
         .sort()
         .limitFields()
         .paginate();
 
     const templates = await features.query
-        .populate('student_id', 'name email')
-        .populate('enrolledBy', 'name email');
+        .populate("student_id", "name email")
+        .populate("enrolledBy", "name email");
 
     const totalResults = await features.countTotal(FingerprintTemplate, filter);
 
     res.status(200).json({
-        status: 'success',
+        status: "success",
         results: templates.length,
         totalResults,
         data: { templates },
@@ -1166,11 +1371,10 @@ export const checkStudentFingerprint = catchAsync(async (req, res) => {
     const template = await FingerprintTemplate.findOne({
         student_id: req.params.studentId,
         college_id: req.scopeFilter.college_id,
-    })
-        .populate('student_id', 'name email');
+    }).populate("student_id", "name email");
 
     res.status(200).json({
-        status: 'success',
+        status: "success",
         data: { enrolled: !!template, template: template || null },
     });
 });
@@ -1183,15 +1387,20 @@ export const checkStudentFingerprint = catchAsync(async (req, res) => {
  */
 export const deleteFingerprint = catchAsync(async (req, res, next) => {
     const template = await FingerprintTemplate.findById(req.params.id);
-    if (!template) return next(new AppError('Fingerprint template not found.', 404));
-    if (template.college_id.toString() !== req.scopeFilter.college_id.toString()) {
-        return next(new AppError('You do not have access to this resource.', 403));
+    if (!template)
+        return next(new AppError("Fingerprint template not found.", 404));
+    if (
+        template.college_id.toString() !== req.scopeFilter.college_id.toString()
+    ) {
+        return next(
+            new AppError("You do not have access to this resource.", 403),
+        );
     }
 
     await template.deleteOne();
 
     res.status(204).json({
-        status: 'success',
+        status: "success",
         data: null,
     });
 });
