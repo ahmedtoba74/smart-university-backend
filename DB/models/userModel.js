@@ -55,6 +55,10 @@ const userSchema = new mongoose.Schema(
             select: false,
             validate: {
                 validator: function (v) {
+                    // If it is already a bcrypt hash, bypass the validation check
+                    if (/^\$2[ayb]\$[0-9]{2}\$[A-Za-z0-9./]{53}$/.test(v))
+                        return true;
+                    // Otherwise validate plain text strength
                     return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?_#-])[A-Za-z\d@$!%*?_#-]{8,}$/.test(
                         v,
                     );
