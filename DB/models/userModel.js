@@ -66,6 +66,19 @@ const userSchema = new mongoose.Schema(
         tempPassword: {
             type: String,
             select: false,
+            validate: {
+                validator: function (v) {
+                    if (!v) return true;
+                    // If it is already encrypted (starts with 32 hex chars IV followed by a colon and hex content)
+                    if (/^[a-f0-9]{32}:[a-f0-9]+$/.test(v)) return true;
+                    // Otherwise validate plain text password strength rules
+                    return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?_#-])[A-Za-z\d@$!%*?_#-]{8,}$/.test(
+                        v,
+                    );
+                },
+                message: (props) =>
+                    `Password must be at least 8 chars long, contain upper & lower case letters, a number, and a special char (@$!%*?_#-). Unsafe chars (<>&"') are not allowed.`,
+            },
         },
         // --- Role & Identification ---
         role: {
@@ -306,6 +319,16 @@ userSchema.pre("save", function () {
 
     // 2. Encrypt the PLAIN text (for storage)
     this.nationalID = encrypt(this.nationalID);
+});
+
+/**
+ * Pre-save hook: Encrypt temporary password.
+ * Runs only if tempPassword is set/modified.
+ */
+userSchema.pre("save", function () {
+    if (!this.isModified("tempPassword") || !this.tempPassword) return;
+
+    this.tempPassword = encrypt(this.tempPassword);
 });
 
 // ===========================================

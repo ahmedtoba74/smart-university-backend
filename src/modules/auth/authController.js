@@ -352,13 +352,13 @@ export const initiateUpdatePassword = catchAsync(async (req, res, next) => {
         );
     }
 
-    user.tempPassword = encrypt(password);
+    user.tempPassword = password;
 
     // Use crypto.randomInt instead of Math.random — cryptographically secure
     const otp = crypto.randomInt(100000, 999999).toString();
     user.saveTwoFactorCode(otp);
 
-    await user.save({ validateBeforeSave: false });
+    await user.save();
 
     try {
         const loginUrl = `${req.protocol}://${req.get("host")}/updatePassword/confirm`;
