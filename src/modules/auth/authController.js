@@ -394,7 +394,7 @@ export const confirmUpdatePassword = catchAsync(async (req, res, next) => {
         return next(new AppError("Please provide OTP", 400));
     }
     const user = await User.findById(req.user.id).select(
-        "+twoFactorSecret +twoFactorExpires +tempPassword",
+        "+twoFactorSecret +twoFactorExpires +tempPassword +loginAttempts +lockUntil +lockoutStage",
     );
 
     if (!user) {
@@ -410,6 +410,19 @@ export const confirmUpdatePassword = catchAsync(async (req, res, next) => {
         );
     }
 
+    // Security Check: Is Account Locked?
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+        const waitMinutes = Math.ceil(
+            (user.lockUntil - Date.now()) / (60 * 1000),
+        );
+        return next(
+            new AppError(
+                `Account locked. Try again in ${waitMinutes} minutes.`,
+                429,
+            ),
+        );
+    }
+
     if (isOtpExpired(user)) {
         return next(
             new AppError(
@@ -419,7 +432,15 @@ export const confirmUpdatePassword = catchAsync(async (req, res, next) => {
         );
     }
     if (!(await user.correctOTP(otp))) {
+        await handleLoginFailure(user);
         return next(new AppError("Incorrect OTP", 401));
+    }
+
+    // Reset Lockout Counters
+    if (user.loginAttempts > 0 || user.lockUntil) {
+        user.loginAttempts = 0;
+        user.lockoutStage = 0;
+        user.lockUntil = undefined;
     }
 
     const decryptedPassword = decrypt(user.tempPassword);
