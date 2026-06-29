@@ -14,6 +14,7 @@
 
 import { createRequire } from 'module';
 import { decryptFingerprintTemplate } from '../utils/cryptoUtils.js';
+import crypto from 'crypto';
 
 const DEFAULT_TEMPLATES_PER_BATCH = 7;
 
@@ -101,13 +102,72 @@ const invokeDirectMethod = async (
  * @returns {string[]}
  */
 const decryptTemplatesToBase64 = (templates) =>
-    templates.map((t) =>
-        decryptFingerprintTemplate({
+    templates.map((t) => {
+        const decryptedBuffer = decryptFingerprintTemplate({
             ciphertext: t.templateData,
             iv: t.templateIv,
             authTag: t.templateAuthTag,
-        }).toString('base64'),
-    );
+        });
+
+        // 1) Verify Buffer Type
+        console.log("Buffer.isBuffer:", Buffer.isBuffer(decryptedBuffer));
+        console.log("Constructor:", decryptedBuffer.constructor.name);
+
+        const sha256 = crypto.createHash('sha256').update(decryptedBuffer).digest('hex');
+        const length = decryptedBuffer.length;
+        const first64 = decryptedBuffer.subarray(0, 64).toString('hex');
+        const middle64 = decryptedBuffer.subarray(352, 416).toString('hex');
+        const last64 = decryptedBuffer.subarray(-64).toString('hex');
+        const studentId = t.student_id;
+        const encryptionVersion = t.encryptionVersion ?? 1;
+
+        const ciphertextByteLen = Buffer.from(t.templateData, 'base64').length;
+        const ivByteLen = Buffer.from(t.templateIv, 'hex').length;
+        const authTagByteLen = Buffer.from(t.templateAuthTag, 'hex').length;
+
+        const base64String = decryptedBuffer.toString('base64');
+        const reconstructedBuffer = Buffer.from(base64String, 'base64');
+
+        // PART 4 — After Decryption (Database Read)
+        console.log(`\n============================================================`);
+        console.log(`[DECRYPTED FROM DB]`);
+        console.log(`Student ID:\n${studentId}`);
+        console.log(`Template Length:\n${length}`);
+        console.log(`Raw Buffer Length:\n${decryptedBuffer.length}`);
+        console.log(`Base64 String Length:\n${base64String.length}`);
+        console.log(`Decoded Buffer Length:\n${reconstructedBuffer.length}`);
+        console.log(`SHA256:\n${sha256}`);
+        console.log(`First 64 bytes:\n${first64}`);
+        console.log(`Middle 64 bytes:\n${middle64}`);
+        console.log(`Last 64 bytes:\n${last64}`);
+        console.log(`Encryption Version:\n${encryptionVersion}`);
+        console.log(`Ciphertext BYTE length:\n${ciphertextByteLen}`);
+        console.log(`IV BYTE length:\n${ivByteLen}`);
+        console.log(`AuthTag BYTE length:\n${authTagByteLen}`);
+        console.log(`============================================================\n`);
+
+        // PART 5 — Verify Base64 Round Trip
+        const isIdentical = Buffer.compare(decryptedBuffer, reconstructedBuffer) === 0;
+
+        console.log(`============================================================`);
+        console.log(`[BASE64 ROUNDTRIP VERIFICATION (DB)]`);
+        console.log(`BASE64 ROUNDTRIP IDENTICAL:\n${isIdentical}`);
+        if (!isIdentical) {
+            let mismatchIndex = -1;
+            for (let i = 0; i < decryptedBuffer.length; i++) {
+                if (decryptedBuffer[i] !== reconstructedBuffer[i]) {
+                    mismatchIndex = i;
+                    break;
+                }
+            }
+            console.log(`First mismatch index:\n${mismatchIndex}`);
+            console.log(`Original byte:\n${decryptedBuffer[mismatchIndex]}`);
+            console.log(`Decoded byte:\n${reconstructedBuffer[mismatchIndex]}`);
+        }
+        console.log(`============================================================\n`);
+
+        return base64String;
+    });
 
 /**
  * Push fingerprint templates to a room device before a session starts.
@@ -163,6 +223,67 @@ export const pushTemplatesToDevice = async (deviceId, templates, sessionMeta) =>
             templates: templateStrings,
             count: templateStrings.length,
         };
+
+        const payloadString = JSON.stringify(payload);
+        const payloadSize = Buffer.byteLength(payloadString, 'utf8');
+
+        // PART 6 — Before Direct Method
+        console.log(`\n============================================================`);
+        console.log(`[BEFORE DIRECT METHOD]`);
+        console.log(`Payload size (bytes):\n${payloadSize}`);
+        console.log(`JSON size:\n${payloadString.length}`);
+        console.log(`Number of templates:\n${payload.templates.length}`);
+        console.log(`TemplateBatchId:\n${payload.templateBatchId}`);
+        console.log(`SessionId:\n${payload.sessionId}`);
+        console.log(`============================================================\n`);
+
+        console.log(`============================================================`);
+        console.log(`[BEFORE DIRECT METHOD - TEMPLATES]`);
+        payload.templates.forEach((tStr, idx) => {
+            const templateBuffer = Buffer.from(tStr, 'base64');
+            const sha256 = crypto.createHash('sha256').update(templateBuffer).digest('hex');
+            const studentId = templates[idx]?.student_id || 'Unknown';
+            const templateIndex = idx;
+            
+            // Middle 64 bytes
+            const middle64 = templateBuffer.subarray(352, 416).toString('hex');
+            const first32 = templateBuffer.subarray(0, 32).toString('hex');
+            const last32 = templateBuffer.subarray(-32).toString('hex');
+
+            // Verify Base64 Round Trip BEFORE sending Direct Method
+            const reconstructed = Buffer.from(templateBuffer.toString('base64'), 'base64');
+            const identical = Buffer.compare(templateBuffer, reconstructed) === 0;
+            const roundtripSha = crypto.createHash('sha256').update(reconstructed).digest('hex');
+
+            console.log(`Template Index: ${templateIndex}`);
+            console.log(`Student ID: ${studentId}`);
+            console.log(`Raw Buffer Length:\n${templateBuffer.length}`);
+            console.log(`Base64 String Length:\n${tStr.length}`);
+            console.log(`Decoded Buffer Length:\n${reconstructed.length}`);
+            console.log(`Base64 STRING length (variable): ${tStr.length}`);
+            console.log(`Decoded BYTE length (variable): ${templateBuffer.length}`);
+            console.log(`SHA256: ${sha256}`);
+            console.log(`First 32 bytes: ${first32}`);
+            console.log(`Middle 64 bytes:\n${middle64}`);
+            console.log(`Last 32 bytes: ${last32}`);
+            console.log(`BASE64 ROUNDTRIP: ${identical}`);
+            console.log(`ROUNDTRIP SHA256: ${roundtripSha}`);
+
+            if (!identical) {
+                let mismatchIndex = -1;
+                for (let i = 0; i < templateBuffer.length; i++) {
+                    if (templateBuffer[i] !== reconstructed[i]) {
+                        mismatchIndex = i;
+                        break;
+                    }
+                }
+                console.log(`First mismatch index:\n${mismatchIndex}`);
+                console.log(`Original byte:\n${templateBuffer[mismatchIndex]}`);
+                console.log(`Reconstructed byte:\n${reconstructed[mismatchIndex]}`);
+            }
+            console.log(`--------------------------------------------------`);
+        });
+        console.log(`============================================================\n`);
 
         const response = await invokeDirectMethod(
             deviceId,

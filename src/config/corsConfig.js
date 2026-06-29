@@ -20,6 +20,9 @@ export const allowedOrigins = [
     "http://localhost:5173",
     "smart-frontend-ege8cxbjbwfrhnah.austriaeast-01.azurewebsites.net",
     "https://smart-frontend-ege8cxbjbwfrhnah.austriaeast-01.azurewebsites.net",
+    "https://smartbsu.uk",
+    "https://www.smartbsu.uk",
+    process.env.FRONTEND_URL,
 ];
 
 // Inject production frontend URL at runtime if configured

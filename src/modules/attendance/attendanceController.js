@@ -26,6 +26,7 @@ import CourseOffering from "../../../DB/models/courseOfferingModel.js";
 import Location from "../../../DB/models/locationModel.js";
 import User from "../../../DB/models/userModel.js";
 import { encryptFingerprintTemplate } from "../../utils/cryptoUtils.js";
+import crypto from "crypto";
 import {
     recalculateAttendance,
     recalculateAttendanceForOffering,
@@ -1298,8 +1299,43 @@ export const registerFingerprint = catchAsync(async (req, res, next) => {
         );
     }
 
+    // PART 1 — Enrollment (Golden Reference)
+    const rawSha256 = crypto.createHash("sha256").update(decoded).digest("hex");
+    console.log(`\n============================================================`);
+    console.log(`[ENROLLMENT RECEIVED]`);
+    console.log(`Student ID:\n${studentId}`);
+    console.log(`Raw Buffer Length:\n${decoded.length}`);
+    console.log(`Base64 String Length:\n${templateData.length}`);
+    console.log(`Decoded Buffer Length:\n${decoded.length}`);
+    console.log(`Raw Template SHA256:\n${rawSha256}`);
+    console.log(`First 64 bytes:\n${decoded.subarray(0, 64).toString("hex")}`);
+    console.log(`Middle 64 bytes:\n${decoded.subarray(352, 416).toString("hex")}`);
+    console.log(`Last 64 bytes:\n${decoded.subarray(-64).toString("hex")}`);
+    console.log(`============================================================\n`);
+
+    // PART 2 — Before Encryption
+    const beforeEncryptSha256 = crypto.createHash("sha256").update(decoded).digest("hex");
+    console.log(`============================================================`);
+    console.log(`[BEFORE ENCRYPTION]`);
+    console.log(`BEFORE ENCRYPTION SHA256:\n${beforeEncryptSha256}`);
+    console.log(`============================================================\n`);
+
     // ── 3. Encrypt Template (D-13) ────────────────────────────────────────────
     const { ciphertext, iv, authTag } = encryptFingerprintTemplate(decoded);
+
+    // PART 3 — After Encryption (Metadata byte lengths)
+    const ciphertextByteLen = Buffer.from(ciphertext, "base64").length;
+    const ivByteLen = Buffer.from(iv, "hex").length;
+    const authTagByteLen = Buffer.from(authTag, "hex").length;
+    const encryptionVersion = 1;
+
+    console.log(`\n============================================================`);
+    console.log(`[ENROLLMENT ENCRYPTED]`);
+    console.log(`Ciphertext BYTE length:\n${ciphertextByteLen}`);
+    console.log(`IV BYTE length:\n${ivByteLen}`);
+    console.log(`Authentication Tag BYTE length:\n${authTagByteLen}`);
+    console.log(`Encryption Version:\n${encryptionVersion}`);
+    console.log(`============================================================\n`);
 
     // ── 4. Upsert Template (one per student) ──────────────────────────────────
     const template = await FingerprintTemplate.findOneAndUpdate(
