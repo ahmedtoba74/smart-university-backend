@@ -12,9 +12,9 @@
  * @module    src/services/iotHubService
  */
 
-import { createRequire } from 'module';
-import { decryptFingerprintTemplate } from '../utils/cryptoUtils.js';
-import crypto from 'crypto';
+import { createRequire } from "module";
+import { decryptFingerprintTemplate } from "../utils/cryptoUtils.js";
+import crypto from "crypto";
 
 const DEFAULT_TEMPLATES_PER_BATCH = 7;
 
@@ -24,12 +24,14 @@ const DEFAULT_TEMPLATES_PER_BATCH = 7;
  */
 const getTemplatesPerBatch = () => {
     const n = Number(process.env.IOT_TEMPLATES_PER_BATCH);
-    return Number.isFinite(n) && n > 0 ? Math.min(n, 200) : DEFAULT_TEMPLATES_PER_BATCH;
+    return Number.isFinite(n) && n > 0
+        ? Math.min(n, 200)
+        : DEFAULT_TEMPLATES_PER_BATCH;
 };
 
 // ─── Mock Mode Guard ──────────────────────────────────────────────────────────
 const isMockMode = () =>
-    process.env.IOT_MOCK_MODE === 'true' ||
+    process.env.IOT_MOCK_MODE === "true" ||
     !process.env.IOT_HUB_CONNECTION_STRING;
 
 let _iotHubClient = null;
@@ -39,7 +41,7 @@ const getIotHubClient = () => {
     if (_iotHubClientReady) return _iotHubClientReady;
     _iotHubClientReady = (async () => {
         const require = createRequire(import.meta.url);
-        const { Client } = require('azure-iothub');
+        const { Client } = require("azure-iothub");
         _iotHubClient = Client.fromConnectionString(
             process.env.IOT_HUB_CONNECTION_STRING,
         );
@@ -58,9 +60,9 @@ const parseDirectMethodPayload = (result) => {
     try {
         const raw = result?.result?.payload;
         if (raw == null) return {};
-        if (typeof raw === 'string') return JSON.parse(raw);
-        if (Buffer.isBuffer(raw)) return JSON.parse(raw.toString('utf8'));
-        if (typeof raw === 'object') return raw;
+        if (typeof raw === "string") return JSON.parse(raw);
+        if (Buffer.isBuffer(raw)) return JSON.parse(raw.toString("utf8"));
+        if (typeof raw === "object") return raw;
         return {};
     } catch {
         return {};
@@ -113,23 +115,28 @@ const decryptTemplatesToBase64 = (templates) =>
         console.log("Buffer.isBuffer:", Buffer.isBuffer(decryptedBuffer));
         console.log("Constructor:", decryptedBuffer.constructor.name);
 
-        const sha256 = crypto.createHash('sha256').update(decryptedBuffer).digest('hex');
+        const sha256 = crypto
+            .createHash("sha256")
+            .update(decryptedBuffer)
+            .digest("hex");
         const length = decryptedBuffer.length;
-        const first64 = decryptedBuffer.subarray(0, 64).toString('hex');
-        const middle64 = decryptedBuffer.subarray(352, 416).toString('hex');
-        const last64 = decryptedBuffer.subarray(-64).toString('hex');
+        const first64 = decryptedBuffer.subarray(0, 64).toString("hex");
+        const middle64 = decryptedBuffer.subarray(352, 416).toString("hex");
+        const last64 = decryptedBuffer.subarray(-64).toString("hex");
         const studentId = t.student_id;
         const encryptionVersion = t.encryptionVersion ?? 1;
 
-        const ciphertextByteLen = Buffer.from(t.templateData, 'base64').length;
-        const ivByteLen = Buffer.from(t.templateIv, 'hex').length;
-        const authTagByteLen = Buffer.from(t.templateAuthTag, 'hex').length;
+        const ciphertextByteLen = Buffer.from(t.templateData, "base64").length;
+        const ivByteLen = Buffer.from(t.templateIv, "hex").length;
+        const authTagByteLen = Buffer.from(t.templateAuthTag, "hex").length;
 
-        const base64String = decryptedBuffer.toString('base64');
-        const reconstructedBuffer = Buffer.from(base64String, 'base64');
+        const base64String = decryptedBuffer.toString("base64");
+        const reconstructedBuffer = Buffer.from(base64String, "base64");
 
         // PART 4 — After Decryption (Database Read)
-        console.log(`\n============================================================`);
+        console.log(
+            `\n============================================================`,
+        );
         console.log(`[DECRYPTED FROM DB]`);
         console.log(`Student ID:\n${studentId}`);
         console.log(`Template Length:\n${length}`);
@@ -144,12 +151,17 @@ const decryptTemplatesToBase64 = (templates) =>
         console.log(`Ciphertext BYTE length:\n${ciphertextByteLen}`);
         console.log(`IV BYTE length:\n${ivByteLen}`);
         console.log(`AuthTag BYTE length:\n${authTagByteLen}`);
-        console.log(`============================================================\n`);
+        console.log(
+            `============================================================\n`,
+        );
 
         // PART 5 — Verify Base64 Round Trip
-        const isIdentical = Buffer.compare(decryptedBuffer, reconstructedBuffer) === 0;
+        const isIdentical =
+            Buffer.compare(decryptedBuffer, reconstructedBuffer) === 0;
 
-        console.log(`============================================================`);
+        console.log(
+            `============================================================`,
+        );
         console.log(`[BASE64 ROUNDTRIP VERIFICATION (DB)]`);
         console.log(`BASE64 ROUNDTRIP IDENTICAL:\n${isIdentical}`);
         if (!isIdentical) {
@@ -164,7 +176,9 @@ const decryptTemplatesToBase64 = (templates) =>
             console.log(`Original byte:\n${decryptedBuffer[mismatchIndex]}`);
             console.log(`Decoded byte:\n${reconstructedBuffer[mismatchIndex]}`);
         }
-        console.log(`============================================================\n`);
+        console.log(
+            `============================================================\n`,
+        );
 
         return base64String;
     });
@@ -180,7 +194,11 @@ const decryptTemplatesToBase64 = (templates) =>
  * @param {{ sessionId: object, sessionNonce: string, templateBatchId: string }} sessionMeta
  * @returns {Promise<{ success: boolean, templatesLoaded?: number, totalRequested?: number, error?: string, result?: object }>}
  */
-export const pushTemplatesToDevice = async (deviceId, templates, sessionMeta) => {
+export const pushTemplatesToDevice = async (
+    deviceId,
+    templates,
+    sessionMeta,
+) => {
     const totalRequested = templates.length;
 
     if (totalRequested > 200) {
@@ -210,7 +228,11 @@ export const pushTemplatesToDevice = async (deviceId, templates, sessionMeta) =>
             `[IoT MOCK] pushTemplatesToDevice: device=${deviceId}, ` +
                 `count=${totalRequested}, session=${sessionMeta.sessionId}`,
         );
-        return { success: true, templatesLoaded: totalRequested, totalRequested };
+        return {
+            success: true,
+            templatesLoaded: totalRequested,
+            totalRequested,
+        };
     }
 
     try {
@@ -225,35 +247,51 @@ export const pushTemplatesToDevice = async (deviceId, templates, sessionMeta) =>
         };
 
         const payloadString = JSON.stringify(payload);
-        const payloadSize = Buffer.byteLength(payloadString, 'utf8');
+        const payloadSize = Buffer.byteLength(payloadString, "utf8");
 
         // PART 6 — Before Direct Method
-        console.log(`\n============================================================`);
+        console.log(
+            `\n============================================================`,
+        );
         console.log(`[BEFORE DIRECT METHOD]`);
         console.log(`Payload size (bytes):\n${payloadSize}`);
         console.log(`JSON size:\n${payloadString.length}`);
         console.log(`Number of templates:\n${payload.templates.length}`);
         console.log(`TemplateBatchId:\n${payload.templateBatchId}`);
         console.log(`SessionId:\n${payload.sessionId}`);
-        console.log(`============================================================\n`);
+        console.log(
+            `============================================================\n`,
+        );
 
-        console.log(`============================================================`);
+        console.log(
+            `============================================================`,
+        );
         console.log(`[BEFORE DIRECT METHOD - TEMPLATES]`);
         payload.templates.forEach((tStr, idx) => {
-            const templateBuffer = Buffer.from(tStr, 'base64');
-            const sha256 = crypto.createHash('sha256').update(templateBuffer).digest('hex');
-            const studentId = templates[idx]?.student_id || 'Unknown';
+            const templateBuffer = Buffer.from(tStr, "base64");
+            const sha256 = crypto
+                .createHash("sha256")
+                .update(templateBuffer)
+                .digest("hex");
+            const studentId = templates[idx]?.student_id || "Unknown";
             const templateIndex = idx;
-            
+
             // Middle 64 bytes
-            const middle64 = templateBuffer.subarray(352, 416).toString('hex');
-            const first32 = templateBuffer.subarray(0, 32).toString('hex');
-            const last32 = templateBuffer.subarray(-32).toString('hex');
+            const middle64 = templateBuffer.subarray(352, 416).toString("hex");
+            const first32 = templateBuffer.subarray(0, 32).toString("hex");
+            const last32 = templateBuffer.subarray(-32).toString("hex");
 
             // Verify Base64 Round Trip BEFORE sending Direct Method
-            const reconstructed = Buffer.from(templateBuffer.toString('base64'), 'base64');
-            const identical = Buffer.compare(templateBuffer, reconstructed) === 0;
-            const roundtripSha = crypto.createHash('sha256').update(reconstructed).digest('hex');
+            const reconstructed = Buffer.from(
+                templateBuffer.toString("base64"),
+                "base64",
+            );
+            const identical =
+                Buffer.compare(templateBuffer, reconstructed) === 0;
+            const roundtripSha = crypto
+                .createHash("sha256")
+                .update(reconstructed)
+                .digest("hex");
 
             console.log(`Template Index: ${templateIndex}`);
             console.log(`Student ID: ${studentId}`);
@@ -261,7 +299,9 @@ export const pushTemplatesToDevice = async (deviceId, templates, sessionMeta) =>
             console.log(`Base64 String Length:\n${tStr.length}`);
             console.log(`Decoded Buffer Length:\n${reconstructed.length}`);
             console.log(`Base64 STRING length (variable): ${tStr.length}`);
-            console.log(`Decoded BYTE length (variable): ${templateBuffer.length}`);
+            console.log(
+                `Decoded BYTE length (variable): ${templateBuffer.length}`,
+            );
             console.log(`SHA256: ${sha256}`);
             console.log(`First 32 bytes: ${first32}`);
             console.log(`Middle 64 bytes:\n${middle64}`);
@@ -279,15 +319,19 @@ export const pushTemplatesToDevice = async (deviceId, templates, sessionMeta) =>
                 }
                 console.log(`First mismatch index:\n${mismatchIndex}`);
                 console.log(`Original byte:\n${templateBuffer[mismatchIndex]}`);
-                console.log(`Reconstructed byte:\n${reconstructed[mismatchIndex]}`);
+                console.log(
+                    `Reconstructed byte:\n${reconstructed[mismatchIndex]}`,
+                );
             }
             console.log(`--------------------------------------------------`);
         });
-        console.log(`============================================================\n`);
+        console.log(
+            `============================================================\n`,
+        );
 
         const response = await invokeDirectMethod(
             deviceId,
-            'loadTemplates',
+            "loadTemplates",
             payload,
             10,
             60,
@@ -304,11 +348,11 @@ export const pushTemplatesToDevice = async (deviceId, templates, sessionMeta) =>
 
         const devicePayload = parseDirectMethodPayload(response);
         const loaded =
-            typeof devicePayload.loaded === 'number'
+            typeof devicePayload.loaded === "number"
                 ? devicePayload.loaded
                 : templateStrings.length;
         const deviceTotal =
-            typeof devicePayload.total === 'number'
+            typeof devicePayload.total === "number"
                 ? devicePayload.total
                 : templateStrings.length;
 
@@ -356,7 +400,7 @@ export const triggerEnrollmentMode = async (deviceId, enrollmentMeta) => {
 
         const response = await invokeDirectMethod(
             deviceId,
-            'startEnrollment',
+            "startEnrollment",
             payload,
             10,
             30,
@@ -386,7 +430,7 @@ export const clearDeviceTemplates = async (deviceId, sessionId) => {
     if (!sessionId) {
         return {
             success: false,
-            error: 'sessionId is required for clearTemplates (firmware authorization guard).',
+            error: "sessionId is required for clearTemplates (firmware authorization guard).",
         };
     }
 
@@ -395,7 +439,7 @@ export const clearDeviceTemplates = async (deviceId, sessionId) => {
 
         const response = await invokeDirectMethod(
             deviceId,
-            'clearTemplates',
+            "clearTemplates",
             payload,
             10,
             15,
