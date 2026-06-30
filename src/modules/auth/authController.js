@@ -66,6 +66,9 @@ const createSendToken = (
         ),
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
+        // F-08: prevent CSRF — cookie is only sent for same-origin requests.
+        // Use "strict" because frontend and backend share the same domain (smartbsu.uk).
+        sameSite: "strict",
     };
     res.cookie("jwt", token, cookieOptions);
     user.password = undefined;

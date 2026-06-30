@@ -272,8 +272,8 @@ export const createAnnouncement = catchAsync(async (req, res, next) => {
         ...(parsedExpiresAt !== undefined && { expiresAt: parsedExpiresAt }),
     });
 
-    // Populate author for response consistency with the WebSocket payload shape
-    await announcement.populate("author_id", "name role");
+    // F-09: populate name only — never expose author role or _id in API responses.
+    await announcement.populate("author_id", "name -_id");
 
     // --- 4. AUDIT LOG ---
     logAuditEvent({
@@ -338,7 +338,8 @@ export const getAnnouncements = catchAsync(async (req, res, next) => {
         .paginate();
 
     const [rawAnnouncements, total] = await Promise.all([
-        features.query.populate("author_id", "name role"),
+        // F-09: name only — role and _id of admin accounts must not be exposed to clients.
+        features.query.populate("author_id", "name -_id"),
         features.countTotal(Announcement, combinedFilter),
     ]);
 
@@ -380,7 +381,8 @@ export const getAnnouncementById = catchAsync(async (req, res, next) => {
     const announcement = await Announcement.findOne({
         _id: req.params.id,
         ...Filter,
-    }).populate("author_id", "name role");
+    // F-09: name only — role and _id of admin accounts must not be exposed.
+    }).populate("author_id", "name -_id");
 
     if (!announcement) {
         return next(new AppError("Announcement not found.", 404));

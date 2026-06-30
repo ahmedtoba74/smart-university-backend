@@ -1011,8 +1011,18 @@ export const buildStudentPayload = async (user) => {
 
     // ── Stats ─────────────────────────────────────────────────────────────────
 
-    // GPA is stored directly on the user document
-    const currentGpa = user.gpa || 0;
+    // GPA, earnedCredits, level, and academicStatus are select:false in userModel.
+    // protect middleware does not include them in req.user, so we re-fetch them here
+    // with an explicit +select. This keeps the dashboard self-contained and correct
+    // regardless of what the auth middleware chooses to load.
+    const studentAcademicData = await safe(
+        () =>
+            User.findById(user._id).select(
+                "+gpa +earnedCredits +level +academicStatus",
+            ),
+        null,
+    );
+    const currentGpa = studentAcademicData?.gpa || 0;
 
     // Credits
     const currentCredits = activeEnrollments.reduce(
@@ -1023,7 +1033,7 @@ export const buildStudentPayload = async (user) => {
                 0),
         0,
     );
-    const earnedCredits = user.earnedCredits || 0;
+    const earnedCredits = studentAcademicData?.earnedCredits || 0;
     // Required credits from settings levelThresholds level 5 (graduation threshold)
     const requiredCredits =
         settings?.levelThresholds?.get(5) ||

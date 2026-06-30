@@ -86,6 +86,11 @@ if (missingEnvVars.length > 0) {
 
 const app = express();
 
+// F-12: Remove Express framework fingerprinting header.
+// helmet() also suppresses this, but explicitly disabling it here ensures it is
+// stripped before any middleware or preflight response (e.g. CORS OPTIONS).
+app.disable("x-powered-by");
+
 // ===========================================
 // 1) GLOBAL CONFIGURATION & SECURITY
 // ===========================================
@@ -281,7 +286,9 @@ app.use("/api/v1/dashboard", dashboardRouter);
 
 // Handle Unhandled Routes — MUST REMAIN LAST
 app.all(/(.*)/, (req, res, next) => {
-    next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
+    // F-10: use a generic message — do NOT echo req.originalUrl.
+    // Reflecting the probed URL back leaks the API path structure to attackers.
+    next(new AppError("Resource not found.", 404));
 });
 
 // Global Error Handler

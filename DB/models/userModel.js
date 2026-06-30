@@ -167,11 +167,15 @@ const userSchema = new mongoose.Schema(
         },
 
         // --- Student Academic Info ---
+        // These fields are only meaningful for the 'student' role.
+        // select: false hides them from all default queries — controllers that need them
+        // (gradebook, enrollment, student profile) must explicitly request with +fieldName.
         level: {
             type: Number,
             enum: [1, 2, 3, 4, 5],
             default: 1,
             sparse: true,
+            select: false,
         },
         gpa: {
             type: Number,
@@ -179,11 +183,25 @@ const userSchema = new mongoose.Schema(
             max: 4.0,
             default: 0.0,
             sparse: true,
+            select: false,
         },
         earnedCredits: {
             type: Number,
             default: 0,
             sparse: true,
+            select: false,
+        },
+        academicStatus: {
+            type: String,
+            enum: [
+                "good_standing",
+                "probation",
+                "honors",
+                "graduated",
+                "suspended",
+            ],
+            default: "good_standing",
+            select: false,
         },
 
         // --- Status & Logic ---
@@ -198,6 +216,7 @@ const userSchema = new mongoose.Schema(
         requiresPasswordChange: {
             type: Boolean,
             default: false,
+            select: false, // F-06: never expose account security state in API responses
         },
         /**
          * @field tokensInvalidatedAt - When set, all JWT tokens issued before this timestamp are invalid.
@@ -205,6 +224,7 @@ const userSchema = new mongoose.Schema(
          */
         tokensInvalidatedAt: {
             type: Date,
+            select: false, // F-06: internal session management — not for client consumption
         },
         /**
          * @field credentialEmailSent - Tracks whether initial credentials email was successfully delivered.
@@ -215,28 +235,20 @@ const userSchema = new mongoose.Schema(
             default: false,
             select: false,
         },
-        academicStatus: {
-            type: String,
-            enum: [
-                "good_standing",
-                "probation",
-                "honors",
-                "graduated",
-                "suspended",
-            ],
-            default: "good_standing",
-        },
         // --- Progressive Lockout Fields ---
         loginAttempts: {
             type: Number,
             default: 0,
+            select: false, // F-06: never expose lockout progress to clients
         },
         lockUntil: {
             type: Date,
+            select: false, // F-06: never expose lockout timing to clients
         },
         lockoutStage: {
             type: Number,
             default: 0,
+            select: false, // F-06: never expose lockout algorithm internals to clients
         },
 
         // --- Two-Factor Authentication (2FA) ---
@@ -246,16 +258,18 @@ const userSchema = new mongoose.Schema(
         },
         twoFactorExpires: {
             type: Date,
+            select: false, // F-06: internal 2FA state — not for client consumption
         },
 
         // --- Account Security Timestamps ---
         lastLoginAt: {
             type: Date,
             default: null,
+            select: false, // F-06: internal session guard — queried explicitly in authMiddleware
         },
-        passwordChangedAt: Date,
-        passwordResetToken: String,
-        passwordResetExpires: Date,
+        passwordChangedAt: { type: Date, select: false }, // F-06: queried explicitly for token rotation guard
+        passwordResetToken: { type: String, select: false },
+        passwordResetExpires: { type: Date, select: false },
 
         /**
          * @field lastEnrollmentAttempt - Write-lock sentinel for the enrollment engine.
@@ -269,7 +283,19 @@ const userSchema = new mongoose.Schema(
     },
     {
         timestamps: true,
-        toJSON: { virtuals: true },
+        toJSON: {
+            virtuals: true,
+            transform: (doc, ret) => {
+                // F-02: never expose the decrypted National ID in any API response.
+                // realNationalID is a virtual getter — it fires on every toJSON call.
+                // Internal code that needs the value must call .toObject({ virtuals: true })
+                // and read realNationalID directly from the result object.
+                delete ret.realNationalID;
+                // F-06: remove MongoDB internal version key (__v) from all responses.
+                delete ret.__v;
+                return ret;
+            },
+        },
         toObject: { virtuals: true },
     },
 );

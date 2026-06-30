@@ -96,6 +96,34 @@ export const getStudentGradebook = catchAsync(async (req, res, next) => {
         );
     }
 
+    // F-01 FIX: Doctor must teach at least one course the target student is enrolled in.
+    // Without this check, any doctor in the same college can read any student's full gradebook
+    // (IDOR — Broken Object Level Authorization). The college-scope filter alone is insufficient.
+    //
+    // Strategy: find all course offerings taught by this doctor in their college,
+    // then verify at least one active enrollment exists for studentId in those offerings.
+    // Using .lean() for performance — we only need to confirm existence, not hydrate.
+    if (req.user.role === "doctor") {
+        const taughtOfferingIds = await CourseOffering.distinct("_id", {
+            doctors_ids: req.user._id,
+            college_id: req.user.college_id,
+        });
+
+        const sharedEnrollment = await Enrollment.findOne({
+            student_id: studentId,
+            course_id: { $in: taughtOfferingIds },
+            status: { $ne: "withdrawn" },
+        }).lean();
+
+        if (!sharedEnrollment) {
+            // Use the same message as the student guard — no information about
+            // whether the studentId belongs to a valid student in this college.
+            return next(
+                new AppError("Not authorized to view this gradebook.", 403),
+            );
+        }
+    }
+
     // IDOR Restrict Cross-College Viewing
     const query = { student_id: studentId, status: { $ne: "withdrawn" } };
     if (req.user.role !== "student" && req.user.role !== "universityAdmin") {
@@ -270,7 +298,7 @@ export const updateSemesterWork = catchAsync(async (req, res, next) => {
         if (sessionCount > 0) {
             return next(
                 new AppError(
-                    'Attendance grades are managed automatically by the fingerprint attendance system. Manual entry is blocked.',
+                    "Attendance grades are managed automatically by the fingerprint attendance system. Manual entry is blocked.",
                     400,
                 ),
             );

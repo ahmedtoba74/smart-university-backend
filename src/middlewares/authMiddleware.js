@@ -48,7 +48,15 @@ export const protect = catchAsync(async (req, res, next) => {
 
     const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
 
-    const currentUser = await User.findById(decoded.id);
+    // F-06 follow-up: explicitly select fields that are hidden by select:false in userModel.
+    // These fields are required by the security guards below:
+    //   +lastLoginAt          → single-session guard (line 62)
+    //   +tokensInvalidatedAt  → invalidation timestamp guard (line 93)
+    //   +passwordChangedAt    → password rotation guard via changedPasswordAfter() (line 78)
+    //   +requiresPasswordChange → enforcePasswordChange middleware reads this from req.user
+    const currentUser = await User.findById(decoded.id).select(
+        "+lastLoginAt +tokensInvalidatedAt +passwordChangedAt +requiresPasswordChange",
+    );
     if (!currentUser) {
         return next(
             new AppError(
