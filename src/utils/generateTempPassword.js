@@ -10,7 +10,7 @@
 import crypto from "crypto";
 
 /**
- * Generates a secure random 10-character minimum password containing at least
+ * Generates a secure random 12-character minimum password containing at least
  * one uppercase, one lowercase, one digit, and one special symbol.
  * Uses `crypto.randomInt` for high entropy.
  * @function generateTempPassword
@@ -29,8 +29,8 @@ export const generateTempPassword = () => {
         lower[crypto.randomInt(lower.length)],
         digits[crypto.randomInt(digits.length)],
         symbols[crypto.randomInt(symbols.length)],
-        // 6 additional fully random characters
-        ...Array.from({ length: 6 }, () => all[crypto.randomInt(all.length)]),
+        // 8 additional fully random characters
+        ...Array.from({ length: 8 }, () => all[crypto.randomInt(all.length)]),
     ];
 
     // Shuffle to prevent predictable category-position patterns

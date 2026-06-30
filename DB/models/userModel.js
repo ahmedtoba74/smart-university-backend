@@ -59,12 +59,12 @@ const userSchema = new mongoose.Schema(
                     if (/^\$2[ayb]\$[0-9]{2}\$[A-Za-z0-9./]{53}$/.test(v))
                         return true;
                     // Otherwise validate plain text strength
-                    return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?_#-])[A-Za-z\d@$!%*?_#-]{8,}$/.test(
+                    return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?_#-])[A-Za-z\d@$!%*?_#-]{12,}$/.test(
                         v,
                     );
                 },
                 message: (props) =>
-                    `Password must be at least 8 chars long, contain upper & lower case letters, a number, and a special char (@$!%*?_#-). Unsafe chars (<>&"') are not allowed.`,
+                    `Password must be at least 12 chars long, contain upper & lower case letters, a number, and a special char (@$!%*?_#-). Unsafe chars (<>&"') are not allowed.`,
             },
         },
         tempPassword: {
@@ -76,12 +76,12 @@ const userSchema = new mongoose.Schema(
                     // If it is already encrypted (starts with 32 hex chars IV followed by a colon and hex content)
                     if (/^[a-f0-9]{32}:[a-f0-9]+$/.test(v)) return true;
                     // Otherwise validate plain text password strength rules
-                    return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?_#-])[A-Za-z\d@$!%*?_#-]{8,}$/.test(
+                    return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?_#-])[A-Za-z\d@$!%*?_#-]{12,}$/.test(
                         v,
                     );
                 },
                 message: (props) =>
-                    `Password must be at least 8 chars long, contain upper & lower case letters, a number, and a special char (@$!%*?_#-). Unsafe chars (<>&"') are not allowed.`,
+                    `Password must be at least 12 chars long, contain upper & lower case letters, a number, and a special char (@$!%*?_#-). Unsafe chars (<>&"') are not allowed.`,
             },
         },
         // --- Role & Identification ---
@@ -337,6 +337,25 @@ userSchema.pre("save", async function (next) {
 });
 
 /**
+ * Pre-save hook: Strip student-only academic fields for non-student roles.
+ *
+ * MongoDB will store default values (level:1, gpa:0, earnedCredits:0,
+ * academicStatus:"good_standing") on every document unless we explicitly
+ * unset them. For doctors, admins, and TAs these fields are meaningless
+ * and should never exist in the database.
+ *
+ * Runs on create and whenever the role field is changed.
+ */
+userSchema.pre("save", function () {
+    if (this.role !== "student") {
+        this.level = undefined;
+        this.gpa = undefined;
+        this.earnedCredits = undefined;
+        this.academicStatus = undefined;
+    }
+});
+
+/**
  * Pre-save hook: Handle National ID Security (Blind Indexing).
  * 1. Hashes plain text for searchability (`nationalIDHash`).
  * 2. Encrypts plain text for storage (`nationalID`).
@@ -451,7 +470,7 @@ userSchema.methods.correctOTP = async function (candidateOTP) {
 
 /**
  * Generates and stores a hashed 2FA secret (OTP).
- * @param {string} otp - The plain 6-digit OTP code generated in controller.
+ * @param {string} otp - The plain OTP code generated in controller.
  */
 userSchema.methods.saveTwoFactorCode = function (otp) {
     this.twoFactorSecret = crypto

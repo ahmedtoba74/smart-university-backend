@@ -16,6 +16,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import Email from "../../services/email.js";
 import { hashForSearch, encrypt, decrypt } from "../../utils/cryptoUtils.js";
+import { generateOTP } from "../../utils/otpUtils.js";
 
 // ===========================================
 // 1) Helper Functions
@@ -213,8 +214,8 @@ export const loginStepOne = catchAsync(async (req, res, next) => {
     // This prevents attackers from resetting their failed attempts by re-authenticating Step 1.
 
     // 2. Generate OTP
-    // Use crypto.randomInt instead of Math.random — cryptographically secure
-    const otp = crypto.randomInt(100000, 999999).toString();
+    // Use generateOTP containing letters and symbols — cryptographically secure
+    const otp = generateOTP(8);
 
     // 3. Hash OTP & Save
     user.saveTwoFactorCode(otp);
@@ -357,8 +358,8 @@ export const initiateUpdatePassword = catchAsync(async (req, res, next) => {
 
     user.tempPassword = password;
 
-    // Use crypto.randomInt instead of Math.random — cryptographically secure
-    const otp = crypto.randomInt(100000, 999999).toString();
+    // Use generateOTP containing letters and symbols — cryptographically secure
+    const otp = generateOTP(8);
     user.saveTwoFactorCode(otp);
 
     await user.save();
