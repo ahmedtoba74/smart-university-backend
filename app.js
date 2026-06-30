@@ -45,6 +45,8 @@ import attendanceRouter from "./src/modules/attendance/attendanceRouter.js";
 import announcementRouter from "./src/modules/announcements/announcementRouter.js";
 // Phase 7 — AI Chatbot Engine
 import chatRouter from "./src/modules/chat/chatRouter.js";
+// Phase 8 — Dashboard Summary
+import dashboardRouter from "./src/modules/dashboard/dashboardRouter.js";
 
 // Load env vars
 dotenv.config();
@@ -273,6 +275,9 @@ app.use("/api/v1/announcements", announcementRouter);
 
 // Phase 7 — AI Chatbot Engine
 app.use("/api/v1/chat", chatRouter);
+
+// Phase 8 — Dashboard Summary
+app.use("/api/v1/dashboard", dashboardRouter);
 
 // Handle Unhandled Routes — MUST REMAIN LAST
 app.all(/(.*)/, (req, res, next) => {

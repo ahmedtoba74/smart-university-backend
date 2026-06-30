@@ -1217,8 +1217,10 @@ export const triggerEnrollMode = catchAsync(async (req, res, next) => {
  * @access IoT device (x-device-secret)
  */
 export const registerFingerprint = catchAsync(async (req, res, next) => {
+    // logs for testing attendence process
     console.log("----------------- Register Fingerprint -----------------");
     console.log("Body:", req.body);
+    // logs for testing attendence process
     const {
         studentId,
         enrollmentNonce,
@@ -1301,6 +1303,8 @@ export const registerFingerprint = catchAsync(async (req, res, next) => {
         );
     }
 
+    // logs for testing attendence process
+
     // PART 1 — Enrollment (Golden Reference)
     const rawSha256 = crypto.createHash("sha256").update(decoded).digest("hex");
     console.log(
@@ -1332,9 +1336,11 @@ export const registerFingerprint = catchAsync(async (req, res, next) => {
     console.log(
         `============================================================\n`,
     );
-
+    // logs for testing attendence process
     // ── 3. Encrypt Template (D-13) ────────────────────────────────────────────
     const { ciphertext, iv, authTag } = encryptFingerprintTemplate(decoded);
+
+    // logs for testing attendence process
 
     // PART 3 — After Encryption (Metadata byte lengths)
     const ciphertextByteLen = Buffer.from(ciphertext, "base64").length;
@@ -1353,6 +1359,7 @@ export const registerFingerprint = catchAsync(async (req, res, next) => {
     console.log(
         `============================================================\n`,
     );
+    // logs for testing attendence process
 
     // ── 4. Upsert Template (one per student) ──────────────────────────────────
     const template = await FingerprintTemplate.findOneAndUpdate(

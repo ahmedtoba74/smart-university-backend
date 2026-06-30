@@ -103,12 +103,24 @@ const invokeDirectMethod = async (
  * @param {Array} templates
  * @returns {string[]}
  */
+// const decryptTemplatesToBase64 = (templates) =>
+//  templates.map((t) =>
+//         decryptFingerprintTemplate({
+//              ciphertext: t.templateData,
+//             iv: t.templateIv,
+//             authTag: t.templateAuthTag,
+//                     }).toString('base64'),
+//     );
+// ``
+
+// logs for testing attendence process
 const decryptTemplatesToBase64 = (templates) =>
     templates.map((t) => {
         const decryptedBuffer = decryptFingerprintTemplate({
             ciphertext: t.templateData,
             iv: t.templateIv,
             authTag: t.templateAuthTag,
+            // logs for testing attendence process
         });
 
         // 1) Verify Buffer Type
@@ -182,7 +194,7 @@ const decryptTemplatesToBase64 = (templates) =>
 
         return base64String;
     });
-
+// logs for testing attendence process
 /**
  * Push fingerprint templates to a room device before a session starts.
  * Firmware expects: { sessionId, sessionNonce, templateBatchId, templates: string[], count }.
@@ -245,6 +257,7 @@ export const pushTemplatesToDevice = async (
             templates: templateStrings,
             count: templateStrings.length,
         };
+        // logs for testing attendence process
 
         const payloadString = JSON.stringify(payload);
         const payloadSize = Buffer.byteLength(payloadString, "utf8");
@@ -328,7 +341,7 @@ export const pushTemplatesToDevice = async (
         console.log(
             `============================================================\n`,
         );
-
+        // logs for testing attendence process
         const response = await invokeDirectMethod(
             deviceId,
             "loadTemplates",
