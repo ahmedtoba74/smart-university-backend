@@ -192,30 +192,18 @@ export const loginStepOne = catchAsync(async (req, res, next) => {
     }
 
     // === Success ===
+    // TODO: enable 2FA/OTP
+    // TEMP BYPASS: Login directly from the first step (skip 2FA/OTP)
+    if (user.loginAttempts > 0 || user.lockUntil) {
+        user.loginAttempts = 0;
+        user.lockoutStage = 0;
+        user.lockUntil = undefined;
+    }
 
-    // 2. Generate OTP
-    // Use generateOTP containing letters and symbols — cryptographically secure
-    const otp = generateOTP(8);
-
-    // 3. Hash OTP & Save
-    user.saveTwoFactorCode(otp);
+    user.lastLoginAt = Date.now();
     await user.save({ validateBeforeSave: false });
 
-    // 4. Send Email
-    try {
-        const loginUrl = `${req.protocol}://${req.get("host")}/login/verify`;
-        await new Email(user, loginUrl).send2FACode(otp, "Login");
-        res.status(200).json({
-            status: "success",
-            message: "2FA Code sent to your email.",
-        });
-    } catch (err) {
-        console.error("❌ [loginStepOne] Email Error:", err);
-        user.twoFactorSecret = undefined;
-        user.twoFactorExpires = undefined;
-        await user.save({ validateBeforeSave: false });
-        return next(new AppError(`Error sending email. Try again!`, 500));
-    }
+    createSendToken(user, 200, res, "Logged in successfully (Bypassed 2FA)");
 });
 
 // 2. Login Step 2: Verify OTP & Issue Token
